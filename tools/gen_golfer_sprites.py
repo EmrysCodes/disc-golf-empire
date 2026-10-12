@@ -195,33 +195,34 @@ def shadow(img: Image.Image, cx, cy, rx=16, ry=5.5) -> Image.Image:
 
 
 def face(img: Image.Image, cx, cy, skin, eye=(38, 44, 58)) -> Image.Image:
-    img = oval(img, cx, cy, 9.0, 9.8, skin, hi=1.2, lo=0.58)
+    img = oval(img, cx, cy, 7.6, 8.2, skin, hi=1.2, lo=0.58)
     d = ImageDraw.Draw(img)
-    # brows
-    d.arc([cx - 7, cy - 5, cx - 1, cy + 1], 200, 340, fill=C(skin, 0.55, 180), width=1)
-    d.arc([cx + 1, cy - 5, cx + 7, cy + 1], 200, 340, fill=C(skin, 0.55, 180), width=1)
-    d.ellipse([cx - 4.2, cy - 1.6, cx - 0.8, cy + 1.4], fill=(250, 250, 255, 235))
-    d.ellipse([cx + 1.2, cy - 1.6, cx + 4.6, cy + 1.4], fill=(250, 250, 255, 235))
-    d.ellipse([cx - 3.4, cy - 0.8, cx - 1.5, cy + 0.7], fill=eye + (255,))
-    d.ellipse([cx + 2.0, cy - 0.8, cx + 3.9, cy + 0.7], fill=eye + (255,))
-    # cheek warmth
-    d.ellipse([cx - 6, cy + 2, cx - 3, cy + 4.5], fill=C(skin, 0.85, 70))
-    d.ellipse([cx + 3, cy + 2, cx + 6, cy + 4.5], fill=C(skin, 0.85, 70))
+    d.arc([cx - 6, cy - 4, cx - 1, cy + 1], 200, 340, fill=C(skin, 0.55, 180), width=1)
+    d.arc([cx + 1, cy - 4, cx + 6, cy + 1], 200, 340, fill=C(skin, 0.55, 180), width=1)
+    d.ellipse([cx - 3.6, cy - 1.4, cx - 0.8, cy + 1.1], fill=(250, 250, 255, 235))
+    d.ellipse([cx + 1.0, cy - 1.4, cx + 3.8, cy + 1.1], fill=(250, 250, 255, 235))
+    d.ellipse([cx - 2.9, cy - 0.7, cx - 1.4, cy + 0.5], fill=eye + (255,))
+    d.ellipse([cx + 1.7, cy - 0.7, cx + 3.2, cy + 0.5], fill=eye + (255,))
+    d.ellipse([cx - 5, cy + 1.5, cx - 2.5, cy + 3.5], fill=C(skin, 0.85, 60))
+    d.ellipse([cx + 2.5, cy + 1.5, cx + 5, cy + 3.5], fill=C(skin, 0.85, 60))
     return img
 
 
-def disc(img: Image.Image, cx, cy, accent, squash: float = 1.0) -> Image.Image:
-    rx, ry = 6.4 * squash, 2.6 / max(0.7, squash * 0.9)
-    img = oval(img, cx + 0.5, cy + 0.6, rx + 0.4, ry + 0.3, (22, 18, 10), hi=0.75, lo=0.4)
+def disc(img: Image.Image, cx, cy, accent, squash: float = 1.0, tilt: float = 0.0) -> Image.Image:
+    """Flat disc golf disc (top-down oval) — never a vertical 'gun' prop."""
+    rx = 7.0 * squash
+    ry = 2.35 / max(0.75, squash * 0.85)
+    # slight perspective tilt just shifts vertical squash
+    ry *= 1.0 + abs(tilt) * 0.08
+    img = oval(img, cx + 0.4, cy + 0.55, rx + 0.35, ry + 0.28, (22, 18, 10), hi=0.7, lo=0.38)
     img = oval(img, cx, cy, rx, ry, accent, hi=1.28, lo=0.68)
-    img = oval(img, cx - 1.0, cy - 0.5, 2.6, 1.0, C(accent, 1.35)[:3], hi=1.2, lo=0.9)
-    # rim line
+    img = oval(img, cx - 1.1, cy - 0.45, 2.8, 0.95, C(accent, 1.35)[:3], hi=1.2, lo=0.9)
     layer = blank(*img.size)
     ImageDraw.Draw(layer).arc(
         [cx - rx, cy - ry, cx + rx, cy + ry],
-        20,
+        15,
         200,
-        fill=C(accent, 0.55, 160),
+        fill=C(accent, 0.5, 150),
         width=1,
     )
     return composite(img, layer)
@@ -234,55 +235,58 @@ def pose_params(anim: str, frame: int, count: int):
     release = 0.0
     if anim == "idle":
         phase = frame / float(count) * math.tau
-        bob = math.sin(phase) * 1.4
-        arm = math.sin(phase) * 2.0
-        stride = math.sin(phase) * 1.0
+        bob = math.sin(phase) * 1.1
+        arm = math.sin(phase) * 1.4
+        stride = math.sin(phase) * 0.8
     elif anim == "walk":
         phase = frame / float(count) * math.tau
-        bob = abs(math.sin(phase)) * 2.8
-        arm = math.sin(phase) * 9.0
-        lean = math.sin(phase) * 1.4
-        stride = math.sin(phase) * 8.0
+        bob = abs(math.sin(phase)) * 2.2
+        arm = math.sin(phase) * 6.5
+        lean = math.sin(phase) * 1.0
+        stride = math.sin(phase) * 7.0
     elif anim == "prepare":
-        bob = math.sin(t * math.tau) * 0.6
-        lean = -2.0 - t * 1.5
-        arm = -4.0 - t * 4.0
-        crouch = 2.0 + t * 1.2
-        stride = -1.5
+        bob = math.sin(t * math.tau) * 0.4
+        lean = -1.5 - t * 1.8
+        arm = -2.0 - t * 5.0
+        crouch = 1.6 + t * 1.0
+        stride = -1.2
     elif anim == "run_up":
-        phase = t * math.tau * 1.35
-        bob = abs(math.sin(phase)) * 3.0
-        lean = -5.0 + t * 8.5
-        arm = -8.5 + t * 14.0
-        stride = math.sin(phase) * 8.5
-        hold_disc = t < 0.86
-        release = max(0.0, (t - 0.72) / 0.28)
+        phase = t * math.tau * 1.25
+        bob = abs(math.sin(phase)) * 2.4
+        lean = -3.5 + t * 6.5
+        arm = -6.0 + t * 10.0
+        stride = math.sin(phase) * 7.5
+        hold_disc = t < 0.9
+        release = max(0.0, (t - 0.78) / 0.22)
     elif anim == "throw":
-        lean = -3.5 + t * 11.5
-        arm = -12.0 + t * 26.0
-        bob = -t * 2.4
-        stride = -2.5 + t * 7.5
-        hold_disc = t < 0.58
-        release = max(0.0, (t - 0.4) / 0.6)
-        crouch = max(0.0, 1.5 - t * 1.8)
+        lean = -2.5 + t * 9.0
+        arm = -8.0 + t * 20.0
+        bob = -t * 1.8
+        stride = -2.0 + t * 6.0
+        hold_disc = t < 0.62
+        release = max(0.0, (t - 0.45) / 0.55)
+        crouch = max(0.0, 1.2 - t * 1.4)
     elif anim == "putt":
-        lean = -1.2 + t * 4.0
-        arm = -3.0 + t * 10.5
-        bob = -1.0
-        crouch = 2.8 - t * 1.6
-        hold_disc = t < 0.45
-        release = max(0.0, (t - 0.32) / 0.68)
-        stride = -0.8 + t * 2.0
+        lean = -0.8 + t * 3.2
+        arm = -2.0 + t * 8.0
+        bob = -0.6
+        crouch = 2.4 - t * 1.4
+        hold_disc = t < 0.48
+        release = max(0.0, (t - 0.35) / 0.65)
+        stride = -0.6 + t * 1.6
     return bob, lean, arm, stride, crouch, hold_disc, release
 
 
 def draw_golfer(v: dict, anim: str, frame: int, count: int) -> Image.Image:
+    """Adult 2.5D golfer facing camera-right. Shadow is runtime-only (not baked)."""
     img = blank(FW, FH)
     cx = FW // 2
-    foot = int(FH * 0.88)
+    foot = int(FH * 0.90)
     bob, lean, arm, stride, crouch, hold_disc, release = pose_params(anim, frame, count)
-    cy = foot + bob + crouch
-    bx = cx + lean
+    t = float(frame) / float(max(count - 1, 1))
+    # Hip / torso anchor — longer legs, smaller head than v1 sheets.
+    cy = foot - 6 + bob + crouch
+    bx = cx + lean * 0.85
 
     shirt = v["shirt"]
     shorts = v["shorts"]
@@ -292,117 +296,113 @@ def draw_golfer(v: dict, anim: str, frame: int, count: int) -> Image.Image:
     cap = v["cap"]
     accent = v["accent"]
 
-    img = shadow(img, bx, foot + 3)
-
-    # Legs
-    lx0, ly0 = bx - 5.5, cy - 1
-    rx0, ry0 = bx + 5.5, cy - 1
-    lx1 = bx - 9 + stride * 0.5
-    rx1 = bx + 10 - stride * 0.5
+    # Legs (longer stride path)
+    lx0, ly0 = bx - 4.5, cy + 2
+    rx0, ry0 = bx + 4.5, cy + 2
+    lx1 = bx - 8 + stride * 0.55
+    rx1 = bx + 9 - stride * 0.55
     ly1 = foot - 1
     ry1 = foot - 1
-    img = limb(img, lx0, ly0, lx1, ly1, 4.4, C(shorts, 0.82)[:3], joint=0.45)
-    img = limb(img, rx0, ry0, rx1, ry1, 4.4, shorts, joint=0.45)
-    img = oval(img, lx1, ly1 + 1.8, 6.2, 3.2, shoes, hi=1.05, lo=0.48)
-    img = oval(img, rx1, ry1 + 1.8, 6.2, 3.2, shoes, hi=1.05, lo=0.48)
-    # sole highlight
-    img = oval(img, lx1 - 0.5, ly1 + 0.6, 3.0, 1.0, C(shoes, 1.25)[:3], hi=1.0, lo=0.9)
-    img = oval(img, rx1 - 0.5, ry1 + 0.6, 3.0, 1.0, C(shoes, 1.25)[:3], hi=1.0, lo=0.9)
+    img = limb(img, lx0, ly0, lx1, ly1, 3.8, C(shorts, 0.82)[:3], joint=0.4)
+    img = limb(img, rx0, ry0, rx1, ry1, 3.8, shorts, joint=0.4)
+    img = oval(img, lx1, ly1 + 1.5, 5.6, 2.8, shoes, hi=1.05, lo=0.48)
+    img = oval(img, rx1, ry1 + 1.5, 5.6, 2.8, shoes, hi=1.05, lo=0.48)
 
-    # Shorts
+    # Hips — soft oval, not a boxy “bag” plate over the legs
+    img = oval(img, bx, cy + 3, 9.5, 7.0, shorts, hi=1.08, lo=0.55)
+    img = oval(img, bx, cy + 1, 7.5, 5.0, C(shorts, 1.1)[:3], hi=1.1, lo=0.85)
+
+    # Torso
+    img = oval(img, bx, cy - 16, 11.0, 14.5, shirt, hi=1.14, lo=0.52)
+    img = oval(img, bx - 10, cy - 14, 4.0, 4.8, C(shirt, 0.9)[:3], hi=1.05, lo=0.55)
+    img = oval(img, bx + 10, cy - 15, 4.0, 4.8, C(shirt, 1.0)[:3], hi=1.1, lo=0.55)
     img = plate(
         img,
         [
-            (bx - 11, cy - 5),
-            (bx + 11, cy - 6),
-            (bx + 10, cy + 10),
-            (bx - 10, cy + 11),
+            (bx - 5, cy - 28),
+            (bx + 5, cy - 29),
+            (bx + 3.5, cy - 19),
+            (bx - 3.5, cy - 18),
         ],
-        C(shorts, 0.95)[:3],
+        C(shirt, 1.16)[:3],
     )
-    # hem crease
-    img = soft(img, [bx - 8, cy + 4, bx + 8, cy + 10], C(shorts, 0.65, 90), 0.8)
+    img = oval(img, bx - 2, cy - 18, 3.6, 5.2, C(shirt, 1.2)[:3], hi=1.08, lo=0.92)
 
-    # Torso volume
-    img = oval(img, bx, cy - 19, 12.5, 16.0, shirt, hi=1.14, lo=0.52)
-    # sleeve stubs
-    img = oval(img, bx - 11, cy - 16, 4.5, 5.5, C(shirt, 0.9)[:3], hi=1.05, lo=0.55)
-    img = oval(img, bx + 11, cy - 17, 4.5, 5.5, C(shirt, 1.0)[:3], hi=1.1, lo=0.55)
-    # collar
-    img = plate(
-        img,
-        [
-            (bx - 6, cy - 32),
-            (bx + 6, cy - 33),
-            (bx + 4, cy - 22),
-            (bx - 4, cy - 21),
-        ],
-        C(shirt, 1.18)[:3],
-    )
-    # chest highlight fold
-    img = oval(img, bx - 2.5, cy - 21, 4.2, 6.0, C(shirt, 1.22)[:3], hi=1.08, lo=0.92)
+    # Trailing (non-throw) arm — hangs / counter-swings, never holds the disc
+    back_ax = bx - 10 - arm * 0.08
+    back_ay = cy - 14
+    back_hx = bx - 13 - arm * 0.2
+    back_hy = cy + 2 + abs(arm) * 0.05
+    img = limb(img, back_ax, back_ay, back_hx, back_hy, 3.4, skin, joint=0.38)
 
-    # Back arm
-    back_ax = bx - 11 - arm * 0.12
-    back_ay = cy - 17
-    back_hx = bx - 16 - arm * 0.28
-    back_hy = cy - 1 + abs(arm) * 0.06
-    img = limb(img, back_ax, back_ay, back_hx, back_hy, 3.8, skin, joint=0.42)
-
-    # Head stack — hair under, face, then cap slightly raised so eyes read
-    hx, hy = bx + 0.8, cy - 38
-    img = oval(img, hx - 0.5, hy - 2, 9.5, 6.5, hair, hi=1.05, lo=0.48)
-    img = face(img, hx, hy + 1.5, skin)
-    # Cap crown (sits above eyes)
+    # Head — slightly smaller; cap brim toward camera (forward), not sideways gun-sight
+    hx, hy = bx + 0.5, cy - 34
+    img = oval(img, hx - 0.4, hy - 1.5, 8.2, 5.5, hair, hi=1.05, lo=0.48)
+    img = face(img, hx, hy + 1.2, skin)
+    img = oval(img, hx, hy - 1.5, 7.8, 4.8, C(cap, 0.95)[:3], hi=1.05, lo=0.6)
+    img = oval(img, hx, hy - 4.0, 7.2, 3.0, C(cap, 1.08)[:3], hi=1.18, lo=0.62)
+    # Forward brim (toward viewer / down-screen) reads as a 2.5D cap, not a side-view visor
     img = poly(
         img,
         [
-            (hx - 9, hy - 3),
-            (hx + 8, hy - 5),
-            (hx + 9, hy + 1),
-            (hx - 9, hy + 2.5),
+            (hx - 6, hy + 0.5),
+            (hx + 6, hy - 0.2),
+            (hx + 7, hy + 3.5),
+            (hx - 7, hy + 4.0),
         ],
-        cap,
+        C(cap, 0.78)[:3],
     )
-    img = oval(img, hx, hy - 4.5, 8.5, 3.6, C(cap, 1.06)[:3], hi=1.18, lo=0.62)
-    # Visor toward throw side
-    img = poly(
-        img,
-        [
-            (hx + 2, hy - 0.5),
-            (hx + 16, hy + 0.5),
-            (hx + 15, hy + 3.5),
-            (hx + 1, hy + 2.5),
-        ],
-        C(cap, 0.82)[:3],
-    )
-    # Cap button
-    img = oval(img, hx, hy - 6.5, 1.6, 1.2, C(cap, 1.25)[:3], hi=1.1, lo=0.9)
+    img = oval(img, hx, hy - 5.8, 1.4, 1.1, C(cap, 1.25)[:3], hi=1.1, lo=0.9)
 
-    # Throw arm
-    throw_sx = bx + 11 + arm * 0.04
-    throw_sy = cy - 18
-    throw_ex = bx + 14 + arm * 0.58
-    throw_ey = cy - 12 - arm * 0.24
-    if anim in ("throw", "run_up") and release > 0.15:
-        throw_ex = bx + 16 + release * 18
-        throw_ey = cy - 22 - release * 12
-    if anim == "putt":
-        throw_ex = bx + 9 + arm * 0.38
-        throw_ey = cy - 7 - arm * 0.18 + crouch * 0.25
-    if anim == "prepare":
-        throw_ex = bx + 7 + arm * 0.22
-        throw_ey = cy - 5
-    img = limb(img, throw_sx, throw_sy, throw_ex, throw_ey, 3.9, skin, joint=0.42)
+    # Throwing arm + disc placement by stage (backhand language)
+    throw_sx = bx + 9
+    throw_sy = cy - 15
+    disc_x = bx + 8
+    disc_y = cy - 8
+    throw_ex, throw_ey = disc_x, disc_y
+
+    if anim in ("idle", "walk"):
+        # Disc cradled at hip/waist — flat oval, elbow soft
+        throw_ex = bx + 9 + arm * 0.08
+        throw_ey = cy - 6 + abs(arm) * 0.04
+        disc_x, disc_y = throw_ex + 1.5, throw_ey + 1.0
+    elif anim == "prepare":
+        # Reach-back across body (backhand)
+        throw_ex = bx - 2 - t * 6
+        throw_ey = cy - 8 - t * 2
+        disc_x, disc_y = throw_ex - 1, throw_ey + 0.5
+    elif anim == "run_up":
+        throw_ex = bx + 2 + arm * 0.25
+        throw_ey = cy - 10 - arm * 0.08
+        if release > 0.1:
+            throw_ex = bx + 10 + release * 12
+            throw_ey = cy - 14 - release * 6
+        disc_x, disc_y = throw_ex + 2, throw_ey
+    elif anim == "throw":
+        # Pull-through: reach-back → whip forward; disc leaves mid-sequence
+        if t < 0.35:
+            throw_ex = bx - 4 - (0.35 - t) * 8
+            throw_ey = cy - 9
+        else:
+            throw_ex = bx + 6 + (t - 0.35) * 22
+            throw_ey = cy - 12 - (t - 0.35) * 8
+        disc_x, disc_y = throw_ex + 2.5, throw_ey
+    elif anim == "putt":
+        throw_ex = bx + 6 + arm * 0.2
+        throw_ey = cy - 5 - arm * 0.1 + crouch * 0.15
+        disc_x, disc_y = throw_ex + 1.5, throw_ey + 0.5
+
+    img = limb(img, throw_sx, throw_sy, throw_ex, throw_ey, 3.5, skin, joint=0.38)
 
     if hold_disc:
-        img = disc(img, throw_ex + 4.0, throw_ey - 0.8, accent, squash=1.08)
-    elif release > 0.3 and anim in ("throw", "run_up", "putt"):
+        img = disc(img, disc_x, disc_y, accent, squash=1.05, tilt=lean * 0.02)
+    elif release > 0.25 and anim in ("throw", "run_up", "putt"):
+        # Soft release glint near the empty hand — not a second prop
         img = soft(
             img,
-            [throw_ex + 2 - 7, throw_ey - 10, throw_ex + 16, throw_ey + 5],
-            (*accent[:3], int(75 + release * 55)),
-            2.2,
+            [throw_ex - 4, throw_ey - 6, throw_ex + 10, throw_ey + 4],
+            (*accent[:3], int(55 + release * 40)),
+            2.0,
         )
 
     img = silhouette_outline(img)
@@ -480,12 +480,14 @@ def sheet_variant(v: dict) -> Path:
 
 
 def montage(paths: list[Path]) -> None:
+    """Idle + mid-throw contact sheet (no baked shadows on cells)."""
     cell_w, cell_h = FW * 2 + 12, FH + 12
     m = Image.new("RGBA", (cell_w * 2, cell_h * 2), (34, 52, 40, 255))
     for i, p in enumerate(paths):
         sheet = Image.open(p).convert("RGBA")
         idle = sheet.crop((0, 0, FW, FH))
-        throw = sheet.crop((3 * FW, 4 * FH, 4 * FW, 5 * FH))
+        # Mid throw (frame 2) still holds the disc flat at the hip/hand.
+        throw = sheet.crop((2 * FW, 4 * FH, 3 * FW, 5 * FH))
         x = (i % 2) * cell_w + 6
         y = (i // 2) * cell_h + 6
         m.paste(idle, (x, y), idle)

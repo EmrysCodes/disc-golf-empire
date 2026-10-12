@@ -33,9 +33,9 @@ const CLOSE_PUTT_RANGE_PIXELS := 22.0
 const STANDSTILL_BASE_FEET := 95.0
 const STANDSTILL_MIN_FEET := 55.0
 const STANDSTILL_MAX_FEET := 140.0
-# Long enough for Kenney throw/putt strips to play through (not a one-frame blink).
-const STANDSTILL_SECONDS := 0.72
-const RUNUP_SECONDS := 1.15
+# Timed to sheet anim lengths (throw ~0.5s @12fps, putt ~0.55s @9fps).
+const STANDSTILL_SECONDS := 0.78
+const RUNUP_SECONDS := 1.25
 const GROUP_WAIT_RADIUS := 25.0
 const TEE_QUEUE_BACK := 56.0
 const TEE_QUEUE_LATERAL := 96.0
@@ -60,6 +60,7 @@ const LAST_NAMES := ["Brooks", "Reed", "Morgan", "Walker", "Parker", "Bennett", 
 const SKILLS := ["power", "accuracy", "putting", "control", "course_iq", "composure"]
 const PALETTE := [Color("5e9ec7"), Color("d59c64"), Color("b46d9b"), Color("81b36c"), Color("cf8d72"), Color("847dc2")]
 const ActorVisualLayerScript = preload("res://visuals/actor_visual_layer.gd")
+const SpriteKitScript = preload("res://visuals/sprite_kit.gd")
 # 2.5D presentation: screen-up (−Y) = altitude; actors y-sorted by world Y.
 const USE_SPRITE_ACTORS := true
 
@@ -85,7 +86,10 @@ const DEBUG_DESTINATIONS := false
 var render_timer: float = 0.0
 var visual_time: float = 0.0
 var visual_positions: Dictionary = {}
-const VISUAL_FOLLOW_RATE := 11.0
+var visual_facing: Dictionary = {} # id -> last travel facing_x for smooth flips
+const VISUAL_FOLLOW_RATE := 13.5
+# Only hard-snap display pose when gameplay teleports farther than this.
+const VISUAL_SNAP_DISTANCE := 96.0
 var rng := RandomNumberGenerator.new()
 var profile_layer: CanvasLayer
 var profile_panel: PanelContainer
@@ -176,15 +180,14 @@ func _boot_demo_visuals() -> void:
 			visitor["stage"] = "throwing"
 			visitor["active_thrower"] = true
 			visitor["wait"] = 1.1
-			visitor["position"] = get_tee_throw_stance(hole_index)
-			set_thought(visitor, "Tee's ours")
+			soft_set_visual_pose(visitor, get_tee_throw_stance(hole_index))
+			set_thought(visitor, "Tee's ours", 2.8)
 		else:
 			visitor["stage"] = "waiting_group"
 			visitor["active_thrower"] = false
 			visitor["wait"] = 0.0
-			visitor["position"] = get_tee_queue_slot(hole_index, visitor, 0)
-			set_thought(visitor, "Waiting my turn")
-		visual_positions[int(visitor["id"])] = visitor["position"]
+			soft_set_visual_pose(visitor, get_tee_queue_slot(hole_index, visitor, 0))
+			set_thought(visitor, "Waiting my turn", 2.6)
 	await get_tree().create_timer(1.2).timeout
 	# Beat 3 — natural run-up → throw → disc_flying (do not skip anim wait).
 	for visitor_value in visitors:
@@ -198,7 +201,7 @@ func _boot_demo_visuals() -> void:
 		shooter["stage"] = "run_up"
 		shooter["shot_animation_total"] = RUNUP_SECONDS
 		shooter["wait"] = RUNUP_SECONDS
-		set_thought(shooter, "Run-up…")
+		set_thought(shooter, "Run-up…", 2.2)
 		break
 	queue_redraw()
 
@@ -662,24 +665,23 @@ func _process(delta: float) -> void:
 							if int(member["id"]) == turn_id:
 								member["stage"] = "throwing"
 								member["wait"] = TEE_PREPARE_SECONDS
-								member["position"] = get_tee_throw_stance(hole_index)
+								soft_set_visual_pose(member, get_tee_throw_stance(hole_index))
 								member["active_thrower"] = true
-								set_thought(member, "Tee's ours")
+								set_thought(member, "Tee's ours", 2.8)
 							else:
 								# Stay in a spaced queue — never share the thrower's pad.
 								member["stage"] = "waiting_group"
 								member["active_thrower"] = false
 								member["lie_ready"] = false
-								member["position"] = get_tee_queue_slot(hole_index, member, 0)
-								set_thought(member, "Waiting my turn", 1.8)
-							visual_positions[int(member["id"])] = member["position"]
+								soft_set_visual_pose(member, get_tee_queue_slot(hole_index, member, 0))
+								set_thought(member, "Waiting my turn", 2.6)
 					else:
 						# Keep queued groups spaced behind the active group.
 						var qrank: int = tee_queue_rank_for(visitor, hole_index)
 						var spaced: Vector2 = get_tee_queue_slot(hole_index, visitor, qrank)
 						if visitor["position"].distance_to(spaced) > 8.0:
 							set_destination(visitor, spaced)
-						set_thought(visitor, "Tee queue…")
+						set_thought(visitor, "Tee queue…", 2.8)
 			"waiting_group":
 				# Tee-order promotion: next thrower leaves the spaced queue for the pad.
 				if int(visitor["strokes"]) == 0 and bool(visitor.get("tee_ready", false)):
@@ -687,15 +689,13 @@ func _process(delta: float) -> void:
 						var promote_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 						visitor["stage"] = "throwing"
 						visitor["active_thrower"] = true
-						visitor["position"] = get_tee_throw_stance(promote_hole)
-						visual_positions[int(visitor["id"])] = visitor["position"]
+						soft_set_visual_pose(visitor, get_tee_throw_stance(promote_hole))
 						visitor["wait"] = BETWEEN_SHOTS_SECONDS
-						set_thought(visitor, "My tee")
+						set_thought(visitor, "My tee", 2.6)
 					else:
 						var hold_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 						var hold_slot: Vector2 = get_tee_queue_slot(hold_hole, visitor, tee_queue_rank_for(visitor, hold_hole))
-						visitor["position"] = hold_slot
-						visual_positions[int(visitor["id"])] = hold_slot
+						soft_set_visual_pose(visitor, hold_slot)
 			"waiting_group_lie":
 				var members: Array = get_group_members(visitor)
 				var all_arrived: bool = true
@@ -740,9 +740,8 @@ func _process(delta: float) -> void:
 				if may_throw(visitor):
 					var hole_index: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 					# Active thrower stands on the pad, not in the queue pile.
-					visitor["position"] = get_tee_throw_stance(hole_index) if int(visitor["strokes"]) == 0 else visitor["position"]
 					if int(visitor["strokes"]) == 0:
-						visual_positions[int(visitor["id"])] = visitor["position"]
+						soft_set_visual_pose(visitor, get_tee_throw_stance(hole_index))
 					var distance_feet: float = (visitor["disc_position"] as Vector2).distance_to(hole_local(hole_index, "basket")) * FEET_PER_PIXEL
 					var golfer: Dictionary = people[int(visitor["id"])]
 					var skills: Dictionary = golfer["skills"]
@@ -754,20 +753,19 @@ func _process(delta: float) -> void:
 					visitor["wait"] = float(visitor["shot_animation_total"])
 					var remain_px: float = (visitor["disc_position"] as Vector2).distance_to(hole_local(hole_index, "basket"))
 					if remain_px <= PUTT_RANGE_PIXELS:
-						set_thought(visitor, "Putting…")
+						set_thought(visitor, "Putting…", 2.2)
 					elif standstill:
-						set_thought(visitor, "Standstill…")
+						set_thought(visitor, "Standstill…", 2.2)
 					else:
-						set_thought(visitor, "Run-up…")
+						set_thought(visitor, "Run-up…", 2.2)
 				else:
 					# Hold non-throwers in their queue slots instead of stacking on the pad.
 					if int(visitor["strokes"]) == 0:
 						var wait_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 						var slot: Vector2 = get_tee_queue_slot(wait_hole, visitor, tee_queue_rank_for(visitor, wait_hole))
 						if visitor["position"].distance_to(slot) > 10.0:
-							visitor["position"] = slot
-							visual_positions[int(visitor["id"])] = slot
-					set_thought(visitor, "Clear the fairway…", 1.2)
+							soft_set_visual_pose(visitor, slot)
+					set_thought(visitor, "Clear the fairway…", 2.4)
 			"standstill", "run_up":
 				perform_throw(visitor)
 				finish_throw_turn(visitor)
@@ -1329,19 +1327,38 @@ func update_visual_positions(delta: float) -> void:
 		var target: Vector2 = visitor["position"]
 		if not visual_positions.has(id):
 			visual_positions[id] = target
+			visual_facing[id] = 1.0
 		else:
 			var previous: Vector2 = visual_positions[id]
-			visual_positions[id] = previous.lerp(target, 1.0 - exp(-VISUAL_FOLLOW_RATE * delta))
+			var delta_pos: Vector2 = target - previous
+			if delta_pos.length() > VISUAL_SNAP_DISTANCE:
+				visual_positions[id] = target
+			else:
+				visual_positions[id] = previous.lerp(target, 1.0 - exp(-VISUAL_FOLLOW_RATE * delta))
+			if delta_pos.length() > 0.35:
+				visual_facing[id] = delta_pos.x
 	for id in visual_positions.keys():
 		if not active.has(id):
 			visual_positions.erase(id)
+			visual_facing.erase(id)
 
 
-func set_thought(visitor: Dictionary, text: String, seconds: float = 2.1) -> void:
+func soft_set_visual_pose(visitor: Dictionary, pose: Vector2) -> void:
+	# Gameplay can jump; display eases unless the jump is large.
+	var id: int = int(visitor["id"])
+	visitor["position"] = pose
+	if not visual_positions.has(id):
+		visual_positions[id] = pose
+		return
+	if visual_positions[id].distance_to(pose) > VISUAL_SNAP_DISTANCE:
+		visual_positions[id] = pose
+
+
+func set_thought(visitor: Dictionary, text: String, seconds: float = 2.4) -> void:
 	# Real AI decision chatter only — skip repeats while the same thought is live.
 	if text.is_empty() or visual_layer == null:
 		return
-	if str(visitor.get("thought_text", "")) == text and float(visitor.get("thought_ttl", 0.0)) > 0.35:
+	if str(visitor.get("thought_text", "")) == text and float(visitor.get("thought_ttl", 0.0)) > 0.55:
 		return
 	visitor["thought_text"] = text
 	visitor["thought_ttl"] = seconds
@@ -1353,6 +1370,7 @@ func sync_actor_visuals(delta: float) -> void:
 	if visual_layer == null or property_manager == null:
 		return
 	var live: Dictionary = {}
+	var use_sheet_bob: bool = SpriteKitScript.using_asset_golfers()
 	for value in visitors:
 		var visitor: Dictionary = value
 		var id: int = int(visitor["id"])
@@ -1364,11 +1382,15 @@ func sync_actor_visuals(delta: float) -> void:
 		var local_position: Vector2 = visual_positions.get(id, visitor["position"])
 		var world: Vector2 = property_manager.property_local_to_world(local_position)
 		var moving: bool = stage.begins_with("walking_")
-		var bob: float = sin(visual_time * 11.0 + float(id)) * 1.1 if moving else 0.0
+		var bob: float = 0.0
+		if moving and not use_sheet_bob:
+			bob = sin(visual_time * 11.0 + float(id)) * 1.1
 		var body: Vector2 = world + Vector2(0.0, bob)
-		var facing_x: float = 1.0
-		if visitor.has("destination"):
-			facing_x = (visitor["destination"] as Vector2 - local_position).x
+		var facing_x: float = float(visual_facing.get(id, 1.0))
+		if visitor.has("destination") and moving:
+			var to_dest: Vector2 = (visitor["destination"] as Vector2) - local_position
+			if to_dest.length() > 2.0:
+				facing_x = to_dest.x
 		var shot_progress: float = -1.0
 		if stage in ["run_up", "standstill", "throwing", "disc_flying"]:
 			var current_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
@@ -1381,10 +1403,10 @@ func sync_actor_visuals(delta: float) -> void:
 			var anim_total: float = maxf(0.01, float(visitor.get("shot_animation_total", 1.0)))
 			shot_progress = 1.0 - clampf(float(visitor["wait"]) / anim_total, 0.0, 1.0)
 			if stage == "run_up":
-				body += heading * (-16.0 * (1.0 - shot_progress))
-				body += Vector2(0.0, sin(shot_progress * PI * 5.0) * 1.6)
+				var slide: float = -14.0 * (1.0 - shot_progress) * (1.0 - shot_progress)
+				body += heading * slide
 			elif stage == "standstill":
-				body += heading * (-2.5 + shot_progress * 2.5)
+				body += heading * (-2.0 + shot_progress * 2.0)
 		var putting: bool = bool(visitor.get("flight_putting", false))
 		if stage in ["throwing", "standstill", "run_up"] and int(visitor["hole_cursor"]) < visitor["holes"].size():
 			var hole_i: int = int(visitor["holes"][int(visitor["hole_cursor"])])

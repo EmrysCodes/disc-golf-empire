@@ -25,12 +25,12 @@ const SHEET_FW := 80
 const SHEET_FH := 96
 const SHEET_COLS := 8
 const SHEET_ANIMS := {
-	"idle": {"row": 0, "count": 6, "fps": 6.0, "loop": true},
-	"walk": {"row": 1, "count": 8, "fps": 11.0, "loop": true},
-	"prepare": {"row": 2, "count": 4, "fps": 7.0, "loop": true},
-	"run_up": {"row": 3, "count": 6, "fps": 12.0, "loop": false},
-	"throw": {"row": 4, "count": 6, "fps": 12.0, "loop": false},
-	"putt": {"row": 5, "count": 5, "fps": 9.0, "loop": false},
+	"idle": {"row": 0, "count": 6, "fps": 5.5, "loop": true},
+	"walk": {"row": 1, "count": 8, "fps": 10.0, "loop": true},
+	"prepare": {"row": 2, "count": 4, "fps": 6.0, "loop": true},
+	"run_up": {"row": 3, "count": 6, "fps": 11.0, "loop": false},
+	"throw": {"row": 4, "count": 6, "fps": 11.0, "loop": false},
+	"putt": {"row": 5, "count": 5, "fps": 8.5, "loop": false},
 }
 
 # Legacy per-pose folder layout (optional; sheets preferred).

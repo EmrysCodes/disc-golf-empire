@@ -8,11 +8,11 @@ Third-party assets vendored under `art/`. Prefer CC0 / public-domain packs so co
 |--|--|
 | **Source** | Original pipeline sheets — `tools/gen_golfer_sprites.py` (celestial-clash–style volumetric 2.5D plates) |
 | **License** | Same as the game repository |
-| **Installed** | `art/golfers/variant_*_sheet.png` (+ idle masters) |
+| **Installed** | `art/golfers/variant_*_sheet.png` (+ idle masters / preview montage) |
 | **Use** | Default AnimatedSprite2D idle / walk / prepare / run-up / throw / putt via `visuals/sprite_kit.gd` (`USE_ASSET_GOLFERS := true`) |
 | **Regenerate** | `python3 tools/gen_golfer_sprites.py` |
 
-Kenney Toon Characters were **tried and rejected** for player-facing golfers (too chibi). They are **not** shipped. Procedural `ImageTexture` strips in `sprite_kit.gd` remain as fallback if sheets are missing or `USE_ASSET_GOLFERS` is flipped off.
+Kenney Toon Characters were **tried and rejected** for player-facing golfers (too chibi). They are **not** shipped. Sheets hold a flat disc (not a side-view prop); ground shadow is runtime-only. Procedural `ImageTexture` strips in `sprite_kit.gd` remain as fallback if sheets are missing or `USE_ASSET_GOLFERS` is flipped off.
 
 ## Kenney — Foliage Sprites (trees)
 
