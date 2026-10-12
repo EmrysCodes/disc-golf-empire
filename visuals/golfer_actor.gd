@@ -28,14 +28,14 @@ func setup(id: int, shirt: Color, palette_index: int) -> void:
 	body = AnimatedSprite2D.new()
 	body.centered = true
 	body.sprite_frames = SpriteKitScript.golfer_frames(palette_index, shirt)
-	# Kenney HD poses are ~192x256; procedural frames are ~36x44.
+	# Procedural frames (~36x44) are the default player-facing look.
+	# Optional realistic packs may use a different scale when enabled.
 	if SpriteKitScript.using_asset_golfers():
-		body.position = Vector2(0, -22)
-		body.scale = Vector2(0.38, 0.38)
-		# Mild shirt-color wash without wrecking skin tones.
-		body.modulate = Color(1, 1, 1).lerp(shirt.lightened(0.15), 0.18)
-		shadow.scale = Vector2(1.85, 1.55)
-		shadow.position = Vector2(4, 10)
+		body.position = Vector2(0, -18)
+		body.scale = Vector2(1.15, 1.15)
+		body.modulate = Color(1, 1, 1)
+		shadow.scale = Vector2(1.6, 1.45)
+		shadow.position = Vector2(3, 11)
 	else:
 		body.position = Vector2(0, -12)
 		body.scale = Vector2(1.9, 1.9)

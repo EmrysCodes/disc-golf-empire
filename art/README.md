@@ -11,7 +11,7 @@
 
 | Path | Role |
 |------|------|
-| `art/golfers/kenney_toon/` | Kenney Toon HD poses (4 variants) → SpriteFrames |
+| `art/golfers/` | Reserved for a future realistic pack (`USE_ASSET_GOLFERS`) |
 | `art/discs/` | Custom disc spin / lie PNGs |
 | `art/trees/kenney_foliage/` | Mobile-sized foliage crowns for trees |
 | `art/terrain/kenney_tiny_town/` | Optional path / grass tile cues |
@@ -19,4 +19,4 @@
 | `art/ATTRIBUTION.md` | Sources + license summary |
 | `visuals/` | Runtime Sprite2D / AnimatedSprite2D pipeline + pools |
 
-`visuals/sprite_kit.gd` loads PNG assets when present and falls back to procedural frames otherwise.
+**Golfers default to procedural frames** in `visuals/sprite_kit.gd` (`USE_ASSET_GOLFERS := false`). Disc PNGs and foliage stay asset-backed.

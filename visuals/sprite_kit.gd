@@ -1,5 +1,7 @@
-# Asset-backed SpriteFrames for golfers + discs (Kenney CC0 + custom discs).
-# Falls back to procedural ImageTextures if PNGs are missing.
+# SpriteFrames for golfers + discs.
+# Golfers default to procedural AnimatedSprite2D frames (pre-Kenney look).
+# Optional realistic packs may be enabled via USE_ASSET_GOLFERS when present.
+# Discs use custom PNGs when available.
 extends RefCounted
 
 const GOLFER_W := 36
@@ -8,23 +10,25 @@ const DISC_SIZE := 18
 const SHADOW_W := 28
 const SHADOW_H := 12
 
+# Kenney Toon is intentionally NOT used as the player-facing default (too chibi).
+# Realistic pack wiring goes under art/golfers/realistic/ when a pack ships.
+const USE_ASSET_GOLFERS := false
+
 const GOLFER_VARIANTS := [
-	"res://art/golfers/kenney_toon/male_person/character_malePerson_",
-	"res://art/golfers/kenney_toon/female_person/character_femalePerson_",
-	"res://art/golfers/kenney_toon/male_adventurer/character_maleAdventurer_",
-	"res://art/golfers/kenney_toon/female_adventurer/character_femaleAdventurer_",
+	"res://art/golfers/realistic/variant_0/",
+	"res://art/golfers/realistic/variant_1/",
+	"res://art/golfers/realistic/variant_2/",
+	"res://art/golfers/realistic/variant_3/",
 ]
 
-# Pose names mapped to gameplay anims (Kenney Toon Characters Pack 1).
-# Avoid "side" in idle — different facing reads as a pop. Stretch throw/putt
-# so release isn't a single-frame blink at standstill/run-up durations.
+# Optional realistic pack pose stems (idle.png, walk_0.png, …) under each variant dir.
 const ANIM_POSE_MAP := {
-	"idle": ["idle", "idle", "think", "idle", "idle", "idle"],
-	"walk": ["walk0", "walk1", "walk2", "walk3", "walk4", "walk5", "walk6", "walk7"],
-	"prepare": ["hold", "hold", "think", "hold", "wide", "hold"],
-	"run_up": ["run0", "run1", "run2", "run1", "run2", "run0", "run1", "run2"],
-	"throw": ["hold", "attack0", "attack1", "attack2", "attack2", "wide"],
-	"putt": ["duck", "hold", "interact", "interact", "wide", "duck"],
+	"idle": ["idle_0", "idle_1", "idle_2", "idle_3", "idle_4", "idle_5"],
+	"walk": ["walk_0", "walk_1", "walk_2", "walk_3", "walk_4", "walk_5", "walk_6", "walk_7"],
+	"prepare": ["prepare_0", "prepare_1", "prepare_2", "prepare_3"],
+	"run_up": ["run_0", "run_1", "run_2", "run_3", "run_4", "run_5"],
+	"throw": ["throw_0", "throw_1", "throw_2", "throw_3", "throw_4", "throw_5"],
+	"putt": ["putt_0", "putt_1", "putt_2", "putt_3", "putt_4"],
 }
 
 const DISC_SPIN_PATHS := [
@@ -57,9 +61,10 @@ static func ensure_ready() -> void:
 		push_warning("SpriteKit: disc PNGs missing — using procedural disc frames")
 		_disc_texture = _make_disc_texture(0.0, 1.0)
 		_disc_frames = _make_disc_frames()
-	_asset_golfers = _probe_golfer_assets()
-	if not _asset_golfers:
-		push_warning("SpriteKit: Kenney golfer PNGs missing — using procedural blobs")
+	# Procedural golfers are the default. Asset packs only when explicitly enabled.
+	_asset_golfers = USE_ASSET_GOLFERS and _probe_golfer_assets()
+	if USE_ASSET_GOLFERS and not _asset_golfers:
+		push_warning("SpriteKit: USE_ASSET_GOLFERS set but realistic PNGs missing — procedural")
 	_ready = true
 
 
@@ -110,7 +115,7 @@ static func shadow_texture() -> Texture2D:
 
 
 static func _probe_golfer_assets() -> bool:
-	var path: String = GOLFER_VARIANTS[0] + "idle.png"
+	var path: String = GOLFER_VARIANTS[0] + "idle_0.png"
 	return ResourceLoader.exists(path)
 
 

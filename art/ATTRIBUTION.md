@@ -2,17 +2,15 @@
 
 Third-party assets vendored under `art/`. Prefer CC0 / public-domain packs so commercial use does not require per-screen credits; attribution is still recorded here and under `art/licenses/`.
 
-## Kenney — Toon Characters Pack 1 (golfers)
+## Active player-facing golfers
 
 | | |
 |--|--|
-| **Source** | [kenney.nl](https://kenney.nl) — Toon Characters Pack 1 |
-| **License** | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| **Installed** | `art/golfers/kenney_toon/{male_person,female_person,male_adventurer,female_adventurer}/` (HD pose subset) |
-| **License file** | `art/licenses/kenney_toonCharacters1_License.txt` |
-| **Use** | Golfer idle / walk / prepare / run-up / throw / putt via `visuals/sprite_kit.gd` SpriteFrames |
+| **Source** | Procedural `ImageTexture` frames in `visuals/sprite_kit.gd` |
+| **License** | Same as the game repository |
+| **Use** | Default AnimatedSprite2D idle / walk / prepare / run-up / throw / putt |
 
-No perfect “disc golfer” pack was available; civilian **person** and **adventurer** poses are composed into throw/putt animations (attack / hold / duck / interact / run / walk).
+Kenney Toon Characters were **tried and rejected** for player-facing golfers (too chibi). They are **not** shipped. A more realistic free pack remains a follow-up; until then procedural is the default (`USE_ASSET_GOLFERS := false`).
 
 ## Kenney — Foliage Sprites (trees)
 
@@ -20,7 +18,7 @@ No perfect “disc golfer” pack was available; civilian **person** and **adven
 |--|--|
 | **Source** | [kenney.nl](https://kenney.nl) — Foliage Sprites |
 | **License** | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
-| **Installed** | `art/trees/kenney_foliage/` (cropped + resized for mobile) |
+| **Installed** | `art/trees/kenney_foliage/` (cropped + resized; greyscale tinted green at draw) |
 | **License file** | `art/licenses/kenney_foliageSprites_License.txt` |
 | **Use** | Property / world tree crowns in `course_renderer.gd` |
 
@@ -43,8 +41,17 @@ No perfect “disc golfer” pack was available; civilian **person** and **adven
 | **Installed** | `art/discs/disc_spin_*.png`, `disc_lie.png`, `basket_accent.png` |
 | **Use** | Disc flight / lie frames in `visuals/sprite_kit.gd` |
 
+## Candidates evaluated (not shipped as golfers)
+
+| Pack | License | Why not used |
+|------|---------|--------------|
+| Kenney Toon Characters Pack 1 | CC0 | Rejected — too chibi / cartoon for desired look |
+| LPC Character Bases (OGA) | Mixed CC-BY / CC-BY-SA | Headless bases; attribution stack; not wired this pass |
+| Tiny Questers Warrior (itch) | Free commercial (credit optional) | Itch direct download blocked in env; follow-up |
+| Battle Heroes 40 (itch) | CC0 | Itch direct download blocked; side-view RPG style TBD |
+| Kenney Top-down Survivor | typically CC0/CC-BY | Strict top-down shooter layers; wrong camera language for current 2.5D |
+
 ## Notes
 
 - Kenney CC0 allows personal, educational, and **commercial** use; crediting Kenney / kenney.nl is appreciated but **not mandatory**.
-- Survivor / other CC-BY packs were evaluated and **not** vendored to avoid attribution overhead.
 - Simulation schemas (`tree_records`, Update 43) are unchanged; art is presentation-only.
