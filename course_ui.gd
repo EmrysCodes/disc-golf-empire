@@ -6,25 +6,31 @@ extends CanvasLayer
 # COLORS
 # ==================================================
 
-const UI_SCALE_FACTOR := 1.61 # Previous 1.15 scale increased by 40%
+const UI_SCALE_FACTOR := 1.35 # Calm cartoony chrome; keep touch targets readable
 
-const COLOR_PANEL := Color(0.045, 0.065, 0.05, 0.97)
-const COLOR_CARD := Color(0.085, 0.115, 0.09, 0.98)
-const COLOR_CARD_HOVER := Color(0.12, 0.16, 0.125, 1.0)
+# Soft green / sand / cream — matches calm HUD park chrome.
+const COLOR_PANEL := Color(0.97, 0.95, 0.90, 1.0)
+const COLOR_CARD := Color(0.91, 0.87, 0.76, 1.0)
+const COLOR_CARD_HOVER := Color(0.70, 0.82, 0.58, 1.0)
 
-const COLOR_GREEN := Color(0.36, 0.78, 0.42, 1.0)
-const COLOR_GREEN_DARK := Color(0.16, 0.38, 0.20, 1.0)
+const COLOR_GREEN := Color(0.40, 0.60, 0.40, 1.0)
+const COLOR_GREEN_DARK := Color(0.26, 0.46, 0.30, 1.0)
 
-const COLOR_GOLD := Color(1.0, 0.79, 0.30, 1.0)
-const COLOR_ORANGE := Color(1.0, 0.52, 0.18, 1.0)
+const COLOR_GOLD := Color(0.14, 0.40, 0.22, 1.0)
+const COLOR_ORANGE := Color(0.62, 0.42, 0.22, 1.0)
 
-const COLOR_RED := Color(0.92, 0.31, 0.31, 1.0)
-const COLOR_RED_DARK := Color(0.34, 0.09, 0.09, 1.0)
+const COLOR_RED := Color(0.62, 0.28, 0.24, 1.0)
+const COLOR_RED_DARK := Color(0.42, 0.18, 0.16, 1.0)
 
-const COLOR_TEXT := Color(0.96, 0.97, 0.95, 1.0)
-const COLOR_MUTED := Color(0.65, 0.71, 0.66, 1.0)
+const COLOR_TEXT := Color(0.16, 0.20, 0.16, 1.0)
+const COLOR_MUTED := Color(0.38, 0.42, 0.36, 1.0)
 
-const COLOR_SHADOW := Color(0.0, 0.0, 0.0, 0.48)
+const COLOR_SHADOW := Color(0.18, 0.22, 0.16, 0.28)
+const COLOR_FACE_LIGHT := Color(0.94, 0.96, 0.91, 1.0)
+const COLOR_TITLE_BAR := Color(0.26, 0.46, 0.30, 1.0)
+const COLOR_TITLE_TEXT := Color(0.98, 0.98, 0.94, 1.0)
+const COLOR_CORNER := 14
+const COLOR_CORNER_SM := 10
 
 
 # ==================================================
@@ -1554,25 +1560,14 @@ func create_panel_style() -> StyleBoxFlat:
 
 	style.bg_color = COLOR_PANEL
 
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 2
+	style.set_border_width_all(2)
+	style.border_color = Color(COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, 0.42)
 
-	style.border_color = Color(
-		COLOR_GREEN.r,
-		COLOR_GREEN.g,
-		COLOR_GREEN.b,
-		0.34
-	)
-
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_left = 12
-	style.corner_radius_bottom_right = 12
+	style.set_corner_radius_all(COLOR_CORNER)
 
 	style.shadow_color = COLOR_SHADOW
-	style.shadow_size = 8
+	style.shadow_size = 10
+	style.shadow_offset = Vector2(0, 3)
 
 	return style
 
@@ -1583,25 +1578,14 @@ func create_floating_panel_style() -> StyleBoxFlat:
 
 	style.bg_color = COLOR_PANEL
 
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
+	style.set_border_width_all(2)
+	style.border_color = Color(COLOR_GREEN.r, COLOR_GREEN.g, COLOR_GREEN.b, 0.42)
 
-	style.border_color = Color(
-		COLOR_GREEN.r,
-		COLOR_GREEN.g,
-		COLOR_GREEN.b,
-		0.42
-	)
-
-	style.corner_radius_top_left = 14
-	style.corner_radius_top_right = 14
-	style.corner_radius_bottom_left = 14
-	style.corner_radius_bottom_right = 14
+	style.set_corner_radius_all(COLOR_CORNER)
 
 	style.shadow_color = COLOR_SHADOW
-	style.shadow_size = 12
+	style.shadow_size = 10
+	style.shadow_offset = Vector2(0, 3)
 
 	return style
 
@@ -1610,29 +1594,12 @@ func create_tooltip_style() -> StyleBoxFlat:
 
 	var style := StyleBoxFlat.new()
 
-	style.bg_color = Color(
-		0.055,
-		0.075,
-		0.06,
-		0.94
-	)
+	style.bg_color = COLOR_FACE_LIGHT
 
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
+	style.set_border_width_all(1)
+	style.border_color = Color(0.80, 0.74, 0.60, 0.90)
 
-	style.border_color = Color(
-		1.0,
-		1.0,
-		1.0,
-		0.10
-	)
-
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
+	style.set_corner_radius_all(COLOR_CORNER_SM)
 
 	return style
 
@@ -1646,17 +1613,14 @@ func create_button_style(
 
 	style.bg_color = background_color
 
-	style.border_width_left = 2
-	style.border_width_top = 2
-	style.border_width_right = 2
-	style.border_width_bottom = 2
-
+	style.set_border_width_all(1)
 	style.border_color = border_color
 
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
+	style.set_corner_radius_all(COLOR_CORNER_SM)
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
 
 	return style
 
@@ -1712,12 +1676,7 @@ func create_ui_button(
 		"normal",
 		create_button_style(
 			COLOR_CARD,
-			Color(
-				1.0,
-				1.0,
-				1.0,
-				0.12
-			)
+			Color(0.22, 0.22, 0.18, 1.0)
 		)
 	)
 
@@ -1725,20 +1684,15 @@ func create_ui_button(
 		"hover",
 		create_button_style(
 			COLOR_CARD_HOVER,
-			Color(
-				1.0,
-				1.0,
-				1.0,
-				0.20
-			)
+			Color(0.22, 0.22, 0.18, 1.0)
 		)
 	)
 
 	button.add_theme_stylebox_override(
 		"pressed",
 		create_button_style(
-			COLOR_GREEN_DARK,
-			COLOR_GREEN
+			COLOR_FACE_LIGHT,
+			Color(0.22, 0.22, 0.18, 1.0)
 		)
 	)
 
@@ -1761,17 +1715,12 @@ func apply_tool_button_style(
 		COLOR_CARD
 	)
 
-	var border_color := Color(
-		1.0,
-		1.0,
-		1.0,
-		0.12
-	)
+	var border_color := Color(0.22, 0.22, 0.18, 1.0)
 
 	if is_selected:
 
 		background_color = (
-			COLOR_GREEN_DARK
+			COLOR_CARD_HOVER
 		)
 
 		border_color = COLOR_GREEN
@@ -1782,6 +1731,10 @@ func apply_tool_button_style(
 			background_color,
 			border_color
 		)
+	)
+	button.add_theme_color_override(
+		"font_color",
+		COLOR_TEXT
 	)
 
 
