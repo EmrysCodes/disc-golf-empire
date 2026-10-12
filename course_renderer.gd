@@ -39,8 +39,29 @@ const RENDER_INTERVAL := 1.0 / MAX_RENDER_FPS
 # Dev-only: draw collision crown (outer) and trunk (inner) rings on property trees.
 const DEBUG_DRAW_TREE_COLLISION := false
 
+# Kenney Foliage Sprites (CC0) — curated bushy crowns for 2.5D tree mass.
+const TREE_SPRITE_PATHS := [
+	"res://art/trees/kenney_foliage/sprite_0052.png",
+	"res://art/trees/kenney_foliage/sprite_0055.png",
+	"res://art/trees/kenney_foliage/sprite_0059.png",
+	"res://art/trees/kenney_foliage/sprite_0062.png",
+	"res://art/trees/kenney_foliage/sprite_0066.png",
+	"res://art/trees/kenney_foliage/sprite_0070.png",
+	"res://art/trees/kenney_foliage/sprite_0073.png",
+	"res://art/trees/kenney_foliage/sprite_0077.png",
+	"res://art/trees/kenney_foliage/sprite_0083.png",
+	"res://art/trees/kenney_foliage/sprite_0086.png",
+	"res://art/trees/kenney_foliage/sprite_0090.png",
+	"res://art/trees/kenney_foliage/sprite_0093.png",
+	"res://art/trees/kenney_foliage/sprite_0096.png",
+	"res://art/trees/kenney_foliage/sprite_0098.png",
+	"res://art/trees/kenney_foliage/sprite_0101.png",
+]
+
 var redraw_requested := true
 var redraw_accumulator := 0.0
+var _tree_textures: Array = []
+var _tree_textures_ready := false
 
 
 # ==================================================
@@ -1032,6 +1053,18 @@ func draw_tree_from_record(
 	)
 
 
+func _ensure_tree_textures() -> void:
+	if _tree_textures_ready:
+		return
+	_tree_textures.clear()
+	for path in TREE_SPRITE_PATHS:
+		if ResourceLoader.exists(path):
+			var tex: Texture2D = load(path) as Texture2D
+			if tex != null:
+				_tree_textures.append(tex)
+	_tree_textures_ready = true
+
+
 func draw_tree(
 	world_position: Vector2,
 	tree_scale: float,
@@ -1042,6 +1075,7 @@ func draw_tree(
 ) -> void:
 
 	# Radii must match PropertyManager / GolferManager collision fields.
+	# 2.5D cues only — Update 43 tree_records schema unchanged.
 	var trunk_radius: float = (
 		trunk_radius_px if trunk_radius_px > 0.0
 		else 4.0 * tree_scale
@@ -1050,7 +1084,7 @@ func draw_tree(
 		crown_radius_px if crown_radius_px > 0.0
 		else 18.0 * tree_scale
 	)
-	# Taller trees read slightly heavier in top-down view (no 3D extrusion).
+	# Taller trees: heavier shadow + crown lifted (−Y = altitude cue).
 	var height_weight: float = 0.0
 	if height_feet > 0.0:
 		height_weight = clampf(
@@ -1058,12 +1092,59 @@ func draw_tree(
 			0.0,
 			1.0
 		)
+	var crown_lift: float = lerpf(4.0, 14.0, height_weight)
+	var crown_center: Vector2 = world_position + Vector2(0.0, -crown_lift)
 
-	draw_circle(
-		world_position + Vector2(6.0, 8.0),
-		crown_radius,
-		Color(0.08, 0.12, 0.07, 0.30 + 0.10 * height_weight)
+	# Soft elliptical ground shadow (isometric lean).
+	draw_set_transform(
+		world_position + Vector2(5.0 + 2.0 * height_weight, 7.0),
+		0.0,
+		Vector2(1.35 + 0.25 * height_weight, 0.48)
 	)
+	draw_circle(
+		Vector2.ZERO,
+		crown_radius * 0.92,
+		Color(0.06, 0.09, 0.05, 0.28 + 0.12 * height_weight)
+	)
+	draw_set_transform(Vector2.ZERO)
+
+	# Trunk reads as a short vertical mass under the crown.
+	draw_line(
+		world_position + Vector2(0.0, -2.0),
+		crown_center + Vector2(0.0, crown_radius * 0.35),
+		Color(0.28, 0.20, 0.12, 0.55 + 0.2 * height_weight),
+		maxf(2.0, trunk_radius * 1.15)
+	)
+	draw_circle(
+		world_position,
+		trunk_radius,
+		Color(0.25, 0.19, 0.11, 0.78)
+	)
+
+	_ensure_tree_textures()
+	if _tree_textures.size() > 0:
+		# Stable variant from world position — no schema change.
+		var idx: int = posmod(
+			int(world_position.x * 0.17) * 73856093
+			^ int(world_position.y * 0.17) * 19349663,
+			_tree_textures.size()
+		)
+		var tex: Texture2D = _tree_textures[idx]
+		var target_h: float = crown_radius * 2.35 + crown_lift * 0.85
+		var s: float = target_h / maxf(1.0, float(tex.get_height()))
+		var size := Vector2(float(tex.get_width()), float(tex.get_height())) * s
+		var top_left := crown_center - Vector2(size.x * 0.5, size.y * 0.82)
+		# Kenney "Shaded" foliage is greyscale — tint to course greens.
+		var tint := Color(0.32, 0.62, 0.34, 1.0)
+		if not owned_tree:
+			tint = Color(0.28, 0.52, 0.30, 1.0)
+		if height_weight > 0.35:
+			tint = tint.darkened(0.10 * height_weight)
+		# Stable per-tree hue variance from position.
+		var hue_nudge: float = 0.92 + 0.16 * (float(posmod(idx * 17, 10)) / 10.0)
+		tint = Color(tint.r * hue_nudge, tint.g, tint.b * (2.0 - hue_nudge), 1.0)
+		draw_texture_rect(tex, Rect2(top_left, size), false, tint)
+		return
 
 	var outer_color := Color(0.13, 0.28, 0.15, 1.0)
 	var inner_color := Color(0.22, 0.42, 0.23, 1.0)
@@ -1078,20 +1159,23 @@ func draw_tree(
 	if height_weight > 0.0:
 		outer_color = outer_color.darkened(0.12 * height_weight)
 
+	# Slightly squashed crowns for faux-perspective mass.
+	draw_set_transform(crown_center, 0.0, Vector2(1.05, 0.88))
 	draw_circle(
-		world_position,
+		Vector2.ZERO,
 		crown_radius,
 		outer_color
 	)
+	draw_set_transform(Vector2.ZERO)
 
 	draw_circle(
-		world_position - Vector2(2.0, 3.0),
+		crown_center - Vector2(2.0, 3.0),
 		crown_radius * 0.72,
 		inner_color
 	)
 
 	draw_circle(
-		world_position
+		crown_center
 		-
 		Vector2(
 			crown_radius * 0.25,
@@ -1099,12 +1183,6 @@ func draw_tree(
 		),
 		crown_radius * 0.27,
 		highlight_color
-	)
-
-	draw_circle(
-		world_position,
-		trunk_radius,
-		Color(0.25, 0.19, 0.11, 0.72)
 	)
 
 
@@ -1823,11 +1901,12 @@ func draw_flight_path(
 
 	var width := PATH_WIDTH_NORMAL
 
+	# Soft guide path so live orange flight trails remain the readable throw cue.
 	var line_color := Color(
-		1.0,
-		1.0,
-		1.0,
-		0.72
+		0.92,
+		0.94,
+		0.88,
+		0.34
 	)
 
 	if is_selected:
@@ -1835,10 +1914,10 @@ func draw_flight_path(
 		width = PATH_WIDTH_SELECTED
 
 		line_color = Color(
-			1.0,
-			1.0,
-			1.0,
-			0.96
+			0.95,
+			0.97,
+			0.92,
+			0.55
 		)
 
 	for i in range(

@@ -1727,6 +1727,67 @@ func remove_property_tree(
 	return true
 
 
+func clear_fairway_corridor(local_a: Vector2, local_b: Vector2, half_width_px: float = 48.0, mid: Vector2 = Vector2(-1, -1)) -> void:
+	# Course-design helper: paint grass and remove trees along a hole corridor.
+	# Keeps Update 43 tree_records schema; only removes records in the fairway band.
+	var points: Array = [local_a]
+	if mid.x >= 0.0:
+		points.append(mid)
+	points.append(local_b)
+	for i in range(points.size() - 1):
+		_paint_corridor_segment(points[i], points[i + 1], half_width_px)
+	# Remove trees inside corridor (iterate backwards for stable indices).
+	for i in range(tree_records.size() - 1, -1, -1):
+		var pos: Vector2 = tree_records[i]["position"]
+		if _point_near_polyline(pos, points, half_width_px * 0.92):
+			remove_property_tree(i)
+	for i in range(bushes.size() - 1, -1, -1):
+		if _point_near_polyline(bushes[i], points, half_width_px * 0.85):
+			bushes.remove_at(i)
+			if i < bush_sizes.size():
+				bush_sizes.remove_at(i)
+
+
+func _paint_corridor_segment(a: Vector2, b: Vector2, half_width_px: float) -> void:
+	var length: float = a.distance_to(b)
+	if length < 1.0:
+		return
+	var steps: int = maxi(4, int(length / (CELL_SIZE * 0.45)))
+	for s in range(steps + 1):
+		var t: float = float(s) / float(steps)
+		var center: Vector2 = a.lerp(b, t)
+		# world_to_cell is named historically but expects property-local coords.
+		var cell: Vector2i = world_to_cell(center)
+		var radius_cells: int = maxi(1, int(ceil(half_width_px / CELL_SIZE)))
+		for dy in range(-radius_cells, radius_cells + 1):
+			for dx in range(-radius_cells, radius_cells + 1):
+				if dx * dx + dy * dy > radius_cells * radius_cells + 1:
+					continue
+				var cx: int = cell.x + dx
+				var cy: int = cell.y + dy
+				if not is_valid_cell(cx, cy):
+					continue
+				if terrain[cy][cx] == WATER:
+					continue
+				terrain[cy][cx] = GRASS
+
+
+func _point_near_polyline(point: Vector2, points: Array, radius: float) -> bool:
+	for i in range(points.size() - 1):
+		var a: Vector2 = points[i]
+		var b: Vector2 = points[i + 1]
+		var ab: Vector2 = b - a
+		var len_sq: float = ab.length_squared()
+		if len_sq < 0.001:
+			if point.distance_to(a) <= radius:
+				return true
+			continue
+		var t: float = clampf((point - a).dot(ab) / len_sq, 0.0, 1.0)
+		if point.distance_to(a.lerp(b, t)) <= radius:
+			return true
+	return false
+
+
 # ==================================================
 # PROPERTY BOUNDS
 # ==================================================

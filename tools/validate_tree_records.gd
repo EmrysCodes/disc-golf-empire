@@ -3,9 +3,11 @@
 # and match visual/collision radius bases.
 extends SceneTree
 
+const PropertyManagerScript = preload("res://property_manager.gd")
+
 
 func _initialize() -> void:
-	var pm := PropertyManager.new()
+	var pm = PropertyManagerScript.new()
 	root.add_child(pm)
 	# Wait one frame so _ready / generate_property runs.
 	await process_frame
