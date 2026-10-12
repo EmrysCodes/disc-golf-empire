@@ -112,7 +112,7 @@ func end_flight_trail(visitor: Dictionary) -> void:
 	_release_trail(int(visitor["id"]), true)
 
 
-func set_thought(visitor: Dictionary, text: String, seconds: float = 2.1) -> void:
+func set_thought(visitor: Dictionary, text: String, seconds: float = 2.4) -> void:
 	if text.is_empty():
 		return
 	var id: int = int(visitor["id"])

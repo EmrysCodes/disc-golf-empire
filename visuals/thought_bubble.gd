@@ -1,7 +1,8 @@
 # Floating AI thought bubble — pooled, follows a world anchor.
 extends Node2D
 
-const DEFAULT_TTL := 2.1
+const DEFAULT_TTL := 2.4
+# Clear of scaled sheet golfers (~0.68×80×96, body at -16).
 const OFFSET := Vector2(0, -34)
 
 var panel: PanelContainer

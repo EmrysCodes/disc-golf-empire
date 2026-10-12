@@ -11,12 +11,13 @@
 
 | Path | Role |
 |------|------|
-| `art/golfers/` | Reserved for a future realistic pack (`USE_ASSET_GOLFERS`) |
+| `art/golfers/` | Pipeline sprite sheets (`variant_*_sheet.png`) — default golfers |
 | `art/discs/` | Custom disc spin / lie PNGs |
 | `art/trees/kenney_foliage/` | Mobile-sized foliage crowns for trees |
 | `art/terrain/kenney_tiny_town/` | Optional path / grass tile cues |
 | `art/licenses/` | Upstream license text copies |
 | `art/ATTRIBUTION.md` | Sources + license summary |
 | `visuals/` | Runtime Sprite2D / AnimatedSprite2D pipeline + pools |
+| `tools/gen_golfer_sprites.py` | Regenerate golfer sheets (celestial-clash–style) |
 
-**Golfers default to procedural frames** in `visuals/sprite_kit.gd` (`USE_ASSET_GOLFERS := false`). Disc PNGs and foliage stay asset-backed.
+**Golfers default to asset sheets** in `visuals/sprite_kit.gd` (`USE_ASSET_GOLFERS := true`). Disc PNGs and foliage stay asset-backed. Procedural strips remain as fallback.

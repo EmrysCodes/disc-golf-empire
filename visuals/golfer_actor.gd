@@ -1,4 +1,4 @@
-# Per-visitor visual: shadow + AnimatedSprite2D with depth sort by world Y.
+# Per-visitor visual: ground shadow + AnimatedSprite2D, depth-sorted by world Y.
 extends Node2D
 
 const SpriteKitScript = preload("res://visuals/sprite_kit.gd")
@@ -10,11 +10,17 @@ const ANIM_RUN_UP := "run_up"
 const ANIM_THROW := "throw"
 const ANIM_PUTT := "putt"
 
+# Sheet cells face camera-right; flip when travel / throw heading is leftward.
+const FACE_DEADZONE := 0.18
+# Run-up holds the walk-like cycle until late wind-up, then plays throw release.
+const RUNUP_THROW_AT := 0.55
+
 var visitor_id: int = -1
 var shadow: Sprite2D
 var body: AnimatedSprite2D
 var _current_anim: String = ""
 var _held_release := false
+var _facing_x: float = 1.0
 
 
 func setup(id: int, shirt: Color, palette_index: int) -> void:
@@ -23,38 +29,41 @@ func setup(id: int, shirt: Color, palette_index: int) -> void:
 	shadow = Sprite2D.new()
 	shadow.texture = SpriteKitScript.shadow_texture()
 	shadow.centered = true
-	shadow.modulate = Color(1, 1, 1, 0.9)
+	shadow.modulate = Color(1, 1, 1, 0.85)
 	add_child(shadow)
 	body = AnimatedSprite2D.new()
 	body.centered = true
 	body.sprite_frames = SpriteKitScript.golfer_frames(palette_index, shirt)
-	# Procedural frames (~36x44) are the default player-facing look.
-	# Optional realistic packs may use a different scale when enabled.
+	# Pipeline sheets are 80×96; draw small so they sit with trees/tees/discs.
+	# 0.68 ≈ 54×65 px on screen (was 1.15 ≈ 92×110 — oversized vs foliage/discs).
 	if SpriteKitScript.using_asset_golfers():
-		body.position = Vector2(0, -18)
-		body.scale = Vector2(1.15, 1.15)
+		body.position = Vector2(0, -16)
+		body.scale = Vector2(0.68, 0.68)
 		body.modulate = Color(1, 1, 1)
-		shadow.scale = Vector2(1.6, 1.45)
-		shadow.position = Vector2(3, 11)
+		# Sheets no longer bake a ground blob — runtime shadow only.
+		shadow.scale = Vector2(0.95, 0.78)
+		shadow.position = Vector2(1, 5)
 	else:
-		body.position = Vector2(0, -12)
-		body.scale = Vector2(1.9, 1.9)
-		shadow.scale = Vector2(1.4, 1.4)
-		shadow.position = Vector2(3, 13)
+		body.position = Vector2(0, -10)
+		body.scale = Vector2(1.35, 1.35)
+		shadow.scale = Vector2(1.05, 1.0)
+		shadow.position = Vector2(2, 9)
 	body.play(ANIM_IDLE)
 	_current_anim = ANIM_IDLE
 	_held_release = false
+	_facing_x = 1.0
 	add_child(body)
 
 
 func set_world_pose(world: Vector2, facing_x: float = 1.0) -> void:
 	position = world
 	z_index = int(clamp(world.y * 0.1, -1000.0, 1000.0))
-	# Kenney toon sheets face camera-right; flip for leftward movement / throws.
-	if facing_x < -0.12:
-		body.flip_h = true
-	elif facing_x > 0.12:
-		body.flip_h = false
+	# Hysteresis so micro heading noise does not flicker flip_h.
+	if facing_x < -FACE_DEADZONE:
+		_facing_x = -1.0
+	elif facing_x > FACE_DEADZONE:
+		_facing_x = 1.0
+	body.flip_h = _facing_x < 0.0
 
 
 func play_for_stage(
@@ -68,8 +77,7 @@ func play_for_stage(
 		desired = ANIM_WALK
 		_held_release = false
 	elif stage == "run_up":
-		# Run cycle for most of the wind-up; last ~32% plays the throw release.
-		if shot_progress >= 0.68:
+		if shot_progress >= RUNUP_THROW_AT:
 			desired = ANIM_THROW
 		else:
 			desired = ANIM_RUN_UP if body.sprite_frames and body.sprite_frames.has_animation(ANIM_RUN_UP) else ANIM_THROW
@@ -102,7 +110,7 @@ func _hold_release_pose(putting: bool) -> void:
 	var hold := ANIM_PUTT if putting else ANIM_THROW
 	if not body.sprite_frames or not body.sprite_frames.has_animation(hold):
 		return
-	# First frame of disc_flying: if throw/putt is mid-play, let it finish once.
+	# Let an in-progress throw/putt finish once when the disc leaves the hand.
 	if _current_anim == hold and body.is_playing() and not _held_release:
 		var last_i: int = maxi(0, body.sprite_frames.get_frame_count(hold) - 1)
 		if body.frame >= last_i:
