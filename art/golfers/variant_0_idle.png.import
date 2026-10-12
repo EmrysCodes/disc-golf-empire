@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://8436570161ad5"
-path="res://.godot/imported/variant_0_idle.png-8436570161ad52a7b8275c8bdd063ac0.ctex"
+uid="uid://c7t8grn1ofab1"
+path="res://.godot/imported/variant_0_idle.png-a2e9ceebdb5568ac24ee02dd41e5386d.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://art/golfers/variant_0_idle.png"
-dest_files=["res://.godot/imported/variant_0_idle.png-8436570161ad52a7b8275c8bdd063ac0.ctex"]
+dest_files=["res://.godot/imported/variant_0_idle.png-a2e9ceebdb5568ac24ee02dd41e5386d.ctex"]
 
 [params]
 

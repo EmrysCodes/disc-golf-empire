@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://1db196c838d95"
-path="res://.godot/imported/variant_0_sheet.png-1db196c838d95d35b617fbf29b738f9e.ctex"
+uid="uid://c5utqttqp04qk"
+path="res://.godot/imported/variant_0_sheet.png-9732f15a24918b4803ecccff054a9fe9.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://art/golfers/variant_0_sheet.png"
-dest_files=["res://.godot/imported/variant_0_sheet.png-1db196c838d95d35b617fbf29b738f9e.ctex"]
+dest_files=["res://.godot/imported/variant_0_sheet.png-9732f15a24918b4803ecccff054a9fe9.ctex"]
 
 [params]
 
