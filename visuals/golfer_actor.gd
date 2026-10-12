@@ -34,19 +34,20 @@ func setup(id: int, shirt: Color, palette_index: int) -> void:
 	body = AnimatedSprite2D.new()
 	body.centered = true
 	body.sprite_frames = SpriteKitScript.golfer_frames(palette_index, shirt)
-	# Pipeline sheets are 80×96; procedural fallback is ~36×44.
+	# Pipeline sheets are 80×96; draw small so they sit with trees/tees/discs.
+	# 0.68 ≈ 54×65 px on screen (was 1.15 ≈ 92×110 — oversized vs foliage/discs).
 	if SpriteKitScript.using_asset_golfers():
-		body.position = Vector2(0, -26)
-		body.scale = Vector2(1.15, 1.15)
+		body.position = Vector2(0, -16)
+		body.scale = Vector2(0.68, 0.68)
 		body.modulate = Color(1, 1, 1)
 		# Sheets no longer bake a ground blob — runtime shadow only.
-		shadow.scale = Vector2(1.55, 1.25)
-		shadow.position = Vector2(1, 8)
+		shadow.scale = Vector2(0.95, 0.78)
+		shadow.position = Vector2(1, 5)
 	else:
-		body.position = Vector2(0, -12)
-		body.scale = Vector2(1.9, 1.9)
-		shadow.scale = Vector2(1.4, 1.4)
-		shadow.position = Vector2(3, 13)
+		body.position = Vector2(0, -10)
+		body.scale = Vector2(1.35, 1.35)
+		shadow.scale = Vector2(1.05, 1.0)
+		shadow.position = Vector2(2, 9)
 	body.play(ANIM_IDLE)
 	_current_anim = ANIM_IDLE
 	_held_release = false

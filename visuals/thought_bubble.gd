@@ -2,8 +2,8 @@
 extends Node2D
 
 const DEFAULT_TTL := 2.4
-# Clear of 80×96 sheet golfers (~body at -26 + scale) so text is not clipped.
-const OFFSET := Vector2(0, -52)
+# Clear of scaled sheet golfers (~0.68×80×96, body at -16).
+const OFFSET := Vector2(0, -34)
 
 var panel: PanelContainer
 var label: Label

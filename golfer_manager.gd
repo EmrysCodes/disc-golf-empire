@@ -1468,7 +1468,7 @@ func _draw() -> void:
 			if selected_id == id:
 				var sel_local: Vector2 = visual_positions.get(id, visitor["position"])
 				var sel_world: Vector2 = property_manager.property_local_to_world(sel_local)
-				draw_arc(sel_world + Vector2(0, -6), 14.0, 0.0, TAU, 20, Color.WHITE, 1.8)
+				draw_arc(sel_world + Vector2(0, -4), 10.0, 0.0, TAU, 20, Color.WHITE, 1.6)
 			continue
 		var moving: bool = stage.begins_with("walking_")
 		var bob: float = sin(visual_time * 11.0 + float(id)) * 1.1 if moving else 0.0
