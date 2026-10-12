@@ -36,6 +36,8 @@ var dynamic_refresh_count: int = 0
 
 const MAX_RENDER_FPS := 30.0
 const RENDER_INTERVAL := 1.0 / MAX_RENDER_FPS
+# Dev-only: draw collision crown (outer) and trunk (inner) rings on property trees.
+const DEBUG_DRAW_TREE_COLLISION := false
 
 var redraw_requested := true
 var redraw_accumulator := 0.0
@@ -979,18 +981,13 @@ func draw_brush_cluster(
 
 func draw_world_trees() -> void:
 
-	var tree_count: int = (
-		property_manager.world_trees.size()
-	)
+	var records: Array = property_manager.world_tree_records
 
-	for i in range(tree_count):
-
-		if i >= property_manager.world_tree_sizes.size():
-			continue
-
-		draw_tree(
-			property_manager.world_trees[i],
-			property_manager.world_tree_sizes[i],
+	for record_value in records:
+		var record: Dictionary = record_value
+		draw_tree_from_record(
+			record["position"],
+			record,
 			false
 		)
 
@@ -1000,34 +997,72 @@ func draw_property_trees() -> void:
 	var origin: Vector2 = (
 		property_manager.property_world_origin
 	)
+	var records: Array = property_manager.tree_records
 
-	for i in range(
-		property_manager.trees.size()
-	):
-
-		if i >= property_manager.tree_sizes.size():
-			continue
-
-		draw_tree(
-			origin + property_manager.trees[i],
-			property_manager.tree_sizes[i],
+	for record_value in records:
+		var record: Dictionary = record_value
+		var world_position: Vector2 = (
+			origin + record["position"]
+		)
+		draw_tree_from_record(
+			world_position,
+			record,
 			true
 		)
+		if DEBUG_DRAW_TREE_COLLISION:
+			draw_tree_collision_debug(
+				world_position,
+				record
+			)
+
+
+func draw_tree_from_record(
+	world_position: Vector2,
+	tree_record: Dictionary,
+	owned_tree: bool
+) -> void:
+
+	draw_tree(
+		world_position,
+		float(tree_record.get("scale", 1.0)),
+		owned_tree,
+		float(tree_record.get("trunk_radius_px", -1.0)),
+		float(tree_record.get("crown_radius_px", -1.0)),
+		float(tree_record.get("height_feet", -1.0))
+	)
 
 
 func draw_tree(
 	world_position: Vector2,
 	tree_scale: float,
-	owned_tree: bool
+	owned_tree: bool,
+	trunk_radius_px: float = -1.0,
+	crown_radius_px: float = -1.0,
+	height_feet: float = -1.0
 ) -> void:
 
-	var trunk_radius: float = 4.0 * tree_scale
-	var crown_radius: float = 18.0 * tree_scale
+	# Radii must match PropertyManager / GolferManager collision fields.
+	var trunk_radius: float = (
+		trunk_radius_px if trunk_radius_px > 0.0
+		else 4.0 * tree_scale
+	)
+	var crown_radius: float = (
+		crown_radius_px if crown_radius_px > 0.0
+		else 18.0 * tree_scale
+	)
+	# Taller trees read slightly heavier in top-down view (no 3D extrusion).
+	var height_weight: float = 0.0
+	if height_feet > 0.0:
+		height_weight = clampf(
+			inverse_lerp(28.0, 70.0, height_feet),
+			0.0,
+			1.0
+		)
 
 	draw_circle(
 		world_position + Vector2(6.0, 8.0),
 		crown_radius,
-		Color(0.08, 0.12, 0.07, 0.30)
+		Color(0.08, 0.12, 0.07, 0.30 + 0.10 * height_weight)
 	)
 
 	var outer_color := Color(0.13, 0.28, 0.15, 1.0)
@@ -1039,6 +1074,9 @@ func draw_tree(
 		outer_color = Color(0.12, 0.25, 0.14, 1.0)
 		inner_color = Color(0.19, 0.36, 0.20, 1.0)
 		highlight_color = Color(0.30, 0.47, 0.27, 1.0)
+
+	if height_weight > 0.0:
+		outer_color = outer_color.darkened(0.12 * height_weight)
 
 	draw_circle(
 		world_position,
@@ -1067,6 +1105,39 @@ func draw_tree(
 		world_position,
 		trunk_radius,
 		Color(0.25, 0.19, 0.11, 0.72)
+	)
+
+
+func draw_tree_collision_debug(
+	world_position: Vector2,
+	tree_record: Dictionary
+) -> void:
+
+	var crown_radius: float = float(
+		tree_record.get("crown_radius_px", 18.0)
+	)
+	var trunk_radius: float = float(
+		tree_record.get("trunk_radius_px", 4.0)
+	)
+	draw_arc(
+		world_position,
+		crown_radius,
+		0.0,
+		TAU,
+		48,
+		Color(0.95, 0.35, 0.2, 0.55),
+		1.5,
+		true
+	)
+	draw_arc(
+		world_position,
+		trunk_radius,
+		0.0,
+		TAU,
+		24,
+		Color(0.85, 0.7, 0.2, 0.7),
+		1.25,
+		true
 	)
 
 
@@ -1954,17 +2025,12 @@ func find_property_tree_at_position(
 
 	var best_index: int = -1
 	var best_distance: float = INF
+	var records: Array = property_manager.tree_records
 
-	for i in range(
-		property_manager.trees.size()
-	):
+	for i in range(records.size()):
 
-		if i >= property_manager.tree_sizes.size():
-			continue
-
-		var local_position: Vector2 = (
-			property_manager.trees[i]
-		)
+		var record: Dictionary = records[i]
+		var local_position: Vector2 = record["position"]
 
 		var tree_world: Vector2 = (
 			property_to_world(
@@ -1972,13 +2038,13 @@ func find_property_tree_at_position(
 			)
 		)
 
-		var tree_scale: float = (
-			property_manager.tree_sizes[i]
+		var crown_radius: float = float(
+			record.get("crown_radius_px", 18.0)
 		)
 
 		var hit_radius: float = max(
 			30.0,
-			24.0 * tree_scale
+			crown_radius + 6.0
 		)
 
 		var distance: float = (
@@ -2743,28 +2809,26 @@ func draw_tree_view_highlight() -> void:
 
 	if (
 		tree_index < 0
-		or tree_index >= property_manager.trees.size()
-		or tree_index >= property_manager.tree_sizes.size()
+		or tree_index >= property_manager.tree_records.size()
 	):
 		return
 
-	var local_position: Vector2 = (
-		property_manager.trees[
-			tree_index
-		]
+	var record: Dictionary = (
+		property_manager.get_tree_record(tree_index)
 	)
+	if record.is_empty():
+		return
 
-	var tree_scale: float = (
-		property_manager.tree_sizes[
-			tree_index
-		]
+	var local_position: Vector2 = record["position"]
+	var crown_radius: float = float(
+		record.get("crown_radius_px", 18.0)
 	)
 
 	draw_selection_ring(
 		property_to_world(
 			local_position
 		),
-		28.0 * tree_scale
+		crown_radius + 10.0
 	)
 
 
