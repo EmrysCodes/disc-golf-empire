@@ -1154,22 +1154,84 @@ func select_at(world_point: Vector2) -> bool:
 
 func build_profile() -> void:
 	profile_layer = CanvasLayer.new()
-	profile_layer.layer = 20
+	profile_layer.layer = 21
 	add_child(profile_layer)
 	profile_panel = PanelContainer.new()
 	profile_panel.visible = false
 	profile_panel.position = Vector2(220, 105)
-	profile_panel.custom_minimum_size = Vector2(295, 0)
+	profile_panel.custom_minimum_size = Vector2(320, 0)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.97, 0.95, 0.90, 1.0)
+	panel_style.border_color = Color(0.40, 0.60, 0.40, 0.42)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(14)
+	panel_style.content_margin_left = 0
+	panel_style.content_margin_right = 0
+	panel_style.content_margin_top = 0
+	panel_style.content_margin_bottom = 12
+	panel_style.shadow_color = Color(0.18, 0.22, 0.16, 0.28)
+	panel_style.shadow_size = 10
+	panel_style.shadow_offset = Vector2(0, 3)
+	profile_panel.add_theme_stylebox_override("panel", panel_style)
 	profile_layer.add_child(profile_panel)
 	var layout := VBoxContainer.new()
+	layout.add_theme_constant_override("separation", 8)
 	profile_panel.add_child(layout)
+	var title := PanelContainer.new()
+	var title_style := StyleBoxFlat.new()
+	title_style.bg_color = Color(0.26, 0.46, 0.30, 1.0)
+	title_style.border_width_top = 2
+	title_style.border_width_bottom = 1
+	title_style.border_color = Color(0.58, 0.72, 0.54, 1.0)
+	title_style.corner_radius_top_left = 14
+	title_style.corner_radius_top_right = 14
+	title_style.corner_radius_bottom_left = 0
+	title_style.corner_radius_bottom_right = 0
+	title_style.content_margin_left = 12
+	title_style.content_margin_right = 8
+	title_style.content_margin_top = 8
+	title_style.content_margin_bottom = 8
+	title.add_theme_stylebox_override("panel", title_style)
+	layout.add_child(title)
+	var title_row := HBoxContainer.new()
+	title.add_child(title_row)
+	var title_label := Label.new()
+	title_label.text = "  Guest profile"
+	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_label.add_theme_font_size_override("font_size", 15)
+	title_label.add_theme_color_override("font_color", Color(0.98, 0.98, 0.94, 1.0))
+	title_row.add_child(title_label)
 	var close_button := Button.new()
-	close_button.text = "Close golfer profile"
+	close_button.text = "Close"
+	close_button.custom_minimum_size = Vector2(64, 32)
+	close_button.focus_mode = Control.FOCUS_NONE
+	close_button.add_theme_font_size_override("font_size", 12)
+	close_button.add_theme_color_override("font_color", Color(0.98, 0.98, 0.94, 1.0))
+	var close_style := StyleBoxFlat.new()
+	close_style.bg_color = Color(0.40, 0.60, 0.40, 0.85)
+	close_style.border_color = Color(0.58, 0.72, 0.54, 1.0)
+	close_style.set_border_width_all(1)
+	close_style.set_corner_radius_all(10)
+	close_style.content_margin_left = 8
+	close_style.content_margin_right = 8
+	close_style.content_margin_top = 4
+	close_style.content_margin_bottom = 4
+	close_button.add_theme_stylebox_override("normal", close_style)
+	close_button.add_theme_stylebox_override("hover", close_style)
+	close_button.add_theme_stylebox_override("pressed", close_style)
 	close_button.pressed.connect(func(): profile_panel.hide())
-	layout.add_child(close_button)
+	title_row.add_child(close_button)
+	var body := MarginContainer.new()
+	body.add_theme_constant_override("margin_left", 14)
+	body.add_theme_constant_override("margin_right", 14)
+	body.add_theme_constant_override("margin_top", 6)
+	body.add_theme_constant_override("margin_bottom", 4)
+	layout.add_child(body)
 	profile_label = Label.new()
 	profile_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	layout.add_child(profile_label)
+	profile_label.add_theme_font_size_override("font_size", 13)
+	profile_label.add_theme_color_override("font_color", Color(0.16, 0.20, 0.16, 1.0))
+	body.add_child(profile_label)
 
 func show_profile(person_id: int) -> void:
 	if not people.has(person_id):

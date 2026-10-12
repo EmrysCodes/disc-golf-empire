@@ -85,26 +85,43 @@ func build_interface() -> void:
 	overlay.add_child(panel)
 	panel.visible = false
 
+	# Calm park chrome (matches HUD / CourseUI).
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.065, 0.09, 0.08, 0.96)
-	style.border_color = Color(0.35, 0.74, 0.49, 0.9)
+	style.bg_color = Color(0.97, 0.95, 0.90, 1.0)
+	style.border_color = Color(0.40, 0.60, 0.40, 0.42)
 	style.set_border_width_all(2)
-	style.set_corner_radius_all(16)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
+	style.set_corner_radius_all(14)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
 	style.content_margin_top = 10
-	style.content_margin_bottom = 10
+	style.content_margin_bottom = 12
+	style.shadow_color = Color(0.18, 0.22, 0.16, 0.28)
+	style.shadow_size = 10
+	style.shadow_offset = Vector2(0, 3)
 	panel.add_theme_stylebox_override("panel", style)
 
 	var stack := VBoxContainer.new()
-	stack.add_theme_constant_override("separation", 5)
+	stack.add_theme_constant_override("separation", 6)
 	panel.add_child(stack)
 
 	heading_button = Button.new()
-	heading_button.text = "♫  DISC GOLF EMPIRE RADIO   ▾"
-	heading_button.flat = true
+	heading_button.text = "  Park Radio"
 	heading_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	heading_button.add_theme_font_size_override("font_size", 20)
+	heading_button.add_theme_font_size_override("font_size", 16)
+	heading_button.add_theme_color_override("font_color", Color(0.98, 0.98, 0.94, 1.0))
+	var title_style := StyleBoxFlat.new()
+	title_style.bg_color = Color(0.26, 0.46, 0.30, 1.0)
+	title_style.border_width_top = 2
+	title_style.border_width_bottom = 1
+	title_style.border_color = Color(0.58, 0.72, 0.54, 1.0)
+	title_style.set_corner_radius_all(10)
+	title_style.content_margin_left = 12
+	title_style.content_margin_right = 10
+	title_style.content_margin_top = 8
+	title_style.content_margin_bottom = 8
+	heading_button.add_theme_stylebox_override("normal", title_style)
+	heading_button.add_theme_stylebox_override("hover", title_style)
+	heading_button.add_theme_stylebox_override("pressed", title_style)
 	heading_button.pressed.connect(toggle_expanded)
 	stack.add_child(heading_button)
 
@@ -119,15 +136,15 @@ func build_interface() -> void:
 	track_label = Label.new()
 	track_label.text = "Disc Golf Empire Radio"
 	track_label.clip_text = true
-	track_label.add_theme_font_size_override("font_size", 27)
-	track_label.add_theme_color_override("font_color", Color(0.95, 0.98, 0.92))
+	track_label.add_theme_font_size_override("font_size", 20)
+	track_label.add_theme_color_override("font_color", Color(0.18, 0.22, 0.18, 1.0))
 	track_column.add_child(track_label)
 
 	details_label = Label.new()
 	details_label.text = "Original Game Soundtrack"
 	details_label.clip_text = true
-	details_label.add_theme_font_size_override("font_size", 17)
-	details_label.add_theme_color_override("font_color", Color(0.68, 0.81, 0.72))
+	details_label.add_theme_font_size_override("font_size", 14)
+	details_label.add_theme_color_override("font_color", Color(0.40, 0.44, 0.38, 1.0))
 	track_column.add_child(details_label)
 
 	var mini_controls := HBoxContainer.new()
@@ -146,9 +163,9 @@ func build_interface() -> void:
 	extra_controls.add_child(separator)
 
 	var label := Label.new()
-	label.text = "PLAYBACK CONTROLS"
-	label.add_theme_font_size_override("font_size", 18)
-	label.add_theme_color_override("font_color", Color(0.66, 0.80, 0.70))
+	label.text = "Playback"
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(0.40, 0.44, 0.38, 1.0))
 	extra_controls.add_child(label)
 
 	var row := HBoxContainer.new()
@@ -169,7 +186,8 @@ func build_interface() -> void:
 	extra_controls.add_child(volume_row)
 	var volume_text := Label.new()
 	volume_text.text = "Music volume"
-	volume_text.add_theme_font_size_override("font_size", 20)
+	volume_text.add_theme_font_size_override("font_size", 14)
+	volume_text.add_theme_color_override("font_color", Color(0.18, 0.22, 0.18, 1.0))
 	volume_row.add_child(volume_text)
 	volume_slider = HSlider.new()
 	volume_slider.custom_minimum_size = Vector2(252.0, 45.0)
@@ -184,8 +202,28 @@ func build_interface() -> void:
 func add_transport_button(parent: HBoxContainer, title: String, callback: Callable) -> Button:
 	var button := Button.new()
 	button.text = title
-	button.custom_minimum_size = Vector2(59.0, 55.0)
-	button.add_theme_font_size_override("font_size", 20)
+	button.custom_minimum_size = Vector2(64.0, 48.0)
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_color_override("font_color", Color(0.16, 0.20, 0.16, 1.0))
+	var face := StyleBoxFlat.new()
+	face.bg_color = Color(0.91, 0.87, 0.76, 1.0)
+	face.border_color = Color(0.80, 0.74, 0.60, 0.90)
+	face.set_border_width_all(1)
+	face.set_corner_radius_all(10)
+	face.content_margin_left = 8
+	face.content_margin_right = 8
+	face.content_margin_top = 6
+	face.content_margin_bottom = 6
+	face.shadow_color = Color(0.20, 0.22, 0.16, 0.12)
+	face.shadow_size = 3
+	face.shadow_offset = Vector2(0, 1)
+	button.add_theme_stylebox_override("normal", face)
+	var hover := face.duplicate()
+	hover.bg_color = Color(0.70, 0.82, 0.58, 1.0)
+	hover.border_color = Color(0.52, 0.68, 0.42, 1.0)
+	hover.set_border_width_all(2)
+	button.add_theme_stylebox_override("hover", hover)
 	button.pressed.connect(callback)
 	parent.add_child(button)
 	return button
@@ -193,7 +231,7 @@ func add_transport_button(parent: HBoxContainer, title: String, callback: Callab
 func toggle_expanded() -> void:
 	expanded = not expanded
 	extra_controls.visible = expanded
-	heading_button.text = "♫  DISC GOLF EMPIRE RADIO   ▴" if expanded else "♫  DISC GOLF EMPIRE RADIO   ▾"
+	heading_button.text = "  Park Radio  ·  close" if expanded else "  Park Radio"
 	if docked_to_toolbar:
 		panel.visible = expanded
 		panel.anchor_left = 0.0
@@ -213,7 +251,7 @@ func toggle_expanded() -> void:
 		panel.custom_minimum_size.x = 649.0 if expanded else 519.0
 
 func play_track(index: int) -> void:
-	if tracks.is_empty():
+	if tracks.is_empty() or player == null:
 		return
 	var next_index: int = posmod(index, tracks.size())
 	var stream_resource: Resource = load(tracks[next_index])
@@ -223,9 +261,12 @@ func play_track(index: int) -> void:
 	current_index = next_index
 	player.stream = stream_resource as AudioStream
 	player.stream_paused = false
+	# Dummy/no-device drivers can error on play(); keep UI usable either way.
 	player.play()
-	track_label.text = tracks[current_index].get_file().get_basename().replace("_", " ")
-	details_label.text = "Track %d of %d  •  Original Game Soundtrack" % [current_index + 1, tracks.size()]
+	if track_label != null:
+		track_label.text = tracks[current_index].get_file().get_basename().replace("_", " ")
+	if details_label != null:
+		details_label.text = "Track %d of %d  •  Original Game Soundtrack" % [current_index + 1, tracks.size()]
 	refresh_buttons()
 
 func _on_track_finished() -> void:
