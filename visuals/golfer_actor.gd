@@ -28,14 +28,13 @@ func setup(id: int, shirt: Color, palette_index: int) -> void:
 	body = AnimatedSprite2D.new()
 	body.centered = true
 	body.sprite_frames = SpriteKitScript.golfer_frames(palette_index, shirt)
-	# Procedural frames (~36x44) are the default player-facing look.
-	# Optional realistic packs may use a different scale when enabled.
+	# Pipeline sheets are 80×96; procedural fallback is ~36×44.
 	if SpriteKitScript.using_asset_golfers():
-		body.position = Vector2(0, -18)
-		body.scale = Vector2(1.15, 1.15)
+		body.position = Vector2(0, -22)
+		body.scale = Vector2(0.95, 0.95)
 		body.modulate = Color(1, 1, 1)
-		shadow.scale = Vector2(1.6, 1.45)
-		shadow.position = Vector2(3, 11)
+		shadow.scale = Vector2(1.55, 1.35)
+		shadow.position = Vector2(2, 10)
 	else:
 		body.position = Vector2(0, -12)
 		body.scale = Vector2(1.9, 1.9)

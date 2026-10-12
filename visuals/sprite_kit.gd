@@ -1,7 +1,7 @@
 # SpriteFrames for golfers + discs.
-# Golfers default to procedural AnimatedSprite2D frames (pre-Kenney look).
-# Optional realistic packs may be enabled via USE_ASSET_GOLFERS when present.
-# Discs use custom PNGs when available.
+# Golfers default to pipeline-generated sheets (celestial-clash style) under art/golfers/.
+# Procedural ImageTexture strips remain as fallback when USE_ASSET_GOLFERS is false
+# or sheets are missing. Discs use custom PNGs when available.
 extends RefCounted
 
 const GOLFER_W := 36
@@ -10,10 +10,30 @@ const DISC_SIZE := 18
 const SHADOW_W := 28
 const SHADOW_H := 12
 
-# Kenney Toon is intentionally NOT used as the player-facing default (too chibi).
-# Realistic pack wiring goes under art/golfers/realistic/ when a pack ships.
-const USE_ASSET_GOLFERS := false
+# Pipeline sheets from tools/gen_golfer_sprites.py (not Kenney Toon).
+const USE_ASSET_GOLFERS := true
 
+const GOLFER_SHEETS := [
+	"res://art/golfers/variant_0_sheet.png",
+	"res://art/golfers/variant_1_sheet.png",
+	"res://art/golfers/variant_2_sheet.png",
+	"res://art/golfers/variant_3_sheet.png",
+]
+
+# Sheet cell size + row layout (matches tools/gen_golfer_sprites.py).
+const SHEET_FW := 80
+const SHEET_FH := 96
+const SHEET_COLS := 8
+const SHEET_ANIMS := {
+	"idle": {"row": 0, "count": 6, "fps": 6.0, "loop": true},
+	"walk": {"row": 1, "count": 8, "fps": 11.0, "loop": true},
+	"prepare": {"row": 2, "count": 4, "fps": 7.0, "loop": true},
+	"run_up": {"row": 3, "count": 6, "fps": 12.0, "loop": false},
+	"throw": {"row": 4, "count": 6, "fps": 12.0, "loop": false},
+	"putt": {"row": 5, "count": 5, "fps": 9.0, "loop": false},
+}
+
+# Legacy per-pose folder layout (optional; sheets preferred).
 const GOLFER_VARIANTS := [
 	"res://art/golfers/realistic/variant_0/",
 	"res://art/golfers/realistic/variant_1/",
@@ -21,7 +41,6 @@ const GOLFER_VARIANTS := [
 	"res://art/golfers/realistic/variant_3/",
 ]
 
-# Optional realistic pack pose stems (idle.png, walk_0.png, …) under each variant dir.
 const ANIM_POSE_MAP := {
 	"idle": ["idle_0", "idle_1", "idle_2", "idle_3", "idle_4", "idle_5"],
 	"walk": ["walk_0", "walk_1", "walk_2", "walk_3", "walk_4", "walk_5", "walk_6", "walk_7"],
@@ -61,10 +80,9 @@ static func ensure_ready() -> void:
 		push_warning("SpriteKit: disc PNGs missing — using procedural disc frames")
 		_disc_texture = _make_disc_texture(0.0, 1.0)
 		_disc_frames = _make_disc_frames()
-	# Procedural golfers are the default. Asset packs only when explicitly enabled.
 	_asset_golfers = USE_ASSET_GOLFERS and _probe_golfer_assets()
 	if USE_ASSET_GOLFERS and not _asset_golfers:
-		push_warning("SpriteKit: USE_ASSET_GOLFERS set but realistic PNGs missing — procedural")
+		push_warning("SpriteKit: USE_ASSET_GOLFERS set but golfer sheets missing — procedural")
 	_ready = true
 
 
@@ -80,13 +98,13 @@ static func using_asset_discs() -> bool:
 
 static func golfer_frames(palette_index: int, shirt: Color) -> SpriteFrames:
 	ensure_ready()
-	var variant: int = posmod(palette_index, GOLFER_VARIANTS.size())
+	var variant: int = posmod(palette_index, GOLFER_SHEETS.size())
 	var key := "asset_%d" % variant if _asset_golfers else "proc_%d_%s" % [variant, shirt.to_html(false)]
 	if _frames_by_key.has(key):
 		return _frames_by_key[key]
 	var frames: SpriteFrames
 	if _asset_golfers:
-		frames = _build_asset_golfer_frames(variant)
+		frames = _build_sheet_golfer_frames(variant)
 	else:
 		frames = SpriteFrames.new()
 		_add_anim(frames, "idle", _build_golfer_strip(shirt, "idle", 6), 6.0, true)
@@ -115,8 +133,10 @@ static func shadow_texture() -> Texture2D:
 
 
 static func _probe_golfer_assets() -> bool:
-	var path: String = GOLFER_VARIANTS[0] + "idle_0.png"
-	return ResourceLoader.exists(path)
+	if ResourceLoader.exists(GOLFER_SHEETS[0]):
+		return true
+	var legacy: String = GOLFER_VARIANTS[0] + "idle_0.png"
+	return ResourceLoader.exists(legacy)
 
 
 static func _try_load_disc_frames() -> bool:
@@ -137,8 +157,55 @@ static func _try_load_disc_frames() -> bool:
 	return true
 
 
-static func _build_asset_golfer_frames(variant: int) -> SpriteFrames:
-	var prefix: String = GOLFER_VARIANTS[variant]
+static func _build_sheet_golfer_frames(variant: int) -> SpriteFrames:
+	var path: String = GOLFER_SHEETS[posmod(variant, GOLFER_SHEETS.size())]
+	if ResourceLoader.exists(path):
+		var tex: Texture2D = load(path) as Texture2D
+		if tex != null:
+			var frames := SpriteFrames.new()
+			for anim_name in SHEET_ANIMS.keys():
+				var spec: Dictionary = SHEET_ANIMS[anim_name]
+				_add_sheet_anim(
+					frames,
+					tex,
+					anim_name,
+					int(spec["row"]),
+					int(spec["count"]),
+					SHEET_FW,
+					SHEET_FH,
+					float(spec["fps"]),
+					bool(spec["loop"])
+				)
+			return frames
+	# Legacy folder poses if sheets absent.
+	return _build_legacy_pose_golfer_frames(variant)
+
+
+static func _add_sheet_anim(
+	frames: SpriteFrames,
+	tex: Texture2D,
+	anim_name: String,
+	row: int,
+	count: int,
+	fw: int,
+	fh: int,
+	fps: float,
+	loop: bool
+) -> void:
+	if frames.has_animation(anim_name):
+		frames.remove_animation(anim_name)
+	frames.add_animation(anim_name)
+	frames.set_animation_speed(anim_name, fps)
+	frames.set_animation_loop(anim_name, loop)
+	for i in range(count):
+		var at := AtlasTexture.new()
+		at.atlas = tex
+		at.region = Rect2(i * fw, row * fh, fw, fh)
+		frames.add_frame(anim_name, at)
+
+
+static func _build_legacy_pose_golfer_frames(variant: int) -> SpriteFrames:
+	var prefix: String = GOLFER_VARIANTS[posmod(variant, GOLFER_VARIANTS.size())]
 	var frames := SpriteFrames.new()
 	var fps := {
 		"idle": 4.0,
@@ -164,7 +231,6 @@ static func _build_asset_golfer_frames(variant: int) -> SpriteFrames:
 			if ResourceLoader.exists(path):
 				textures.append(load(path) as Texture2D)
 		if textures.is_empty():
-			# Keep anim present so callers never crash.
 			textures.append(_make_golfer_frame(Color(0.4, 0.55, 0.7), "idle", 0.0, 0))
 		_add_anim(
 			frames,
