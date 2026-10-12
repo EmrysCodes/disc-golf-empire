@@ -284,6 +284,12 @@ func create_components() -> void:
 	job_manager.set_walkway_manager(path_manager)
 	course_ui.set_walkway_manager(path_manager)
 
+	# Seed a playable starter layout (property-local) before golfers spawn.
+	if course_manager != null and course_manager.has_method("generate_starter_layout"):
+		course_manager.generate_starter_layout(property_manager)
+		if course_renderer != null:
+			course_renderer.refresh()
+
 	# Persistent visitors draw independently of retained terrain layers.
 	# Golfer simulation is optional at boot; it must not prevent the park from loading.
 	if ResourceLoader.exists(GOLFER_MANAGER_PATH):

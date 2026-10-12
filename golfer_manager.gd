@@ -36,12 +36,21 @@ const STANDSTILL_MAX_FEET := 140.0
 const STANDSTILL_SECONDS := 0.45
 const RUNUP_SECONDS := 1.05
 const GROUP_WAIT_RADIUS := 25.0
+const TEE_QUEUE_BACK := 56.0
+const TEE_QUEUE_LATERAL := 96.0
+const TEE_QUEUE_DEPTH := 38.0
+const CHECKIN_SLOT_SPACING := 44.0
+const BASKET_WAIT_RADIUS := 36.0
+const GROUP_WAIT_SPACING := 20.0
 const FLIGHT_MIN_SECONDS := 0.65
 const FLIGHT_MAX_SECONDS := 2.3
 # ~38 ft apex at FEET_PER_PIXEL. Update 43 keeps this arc: tall trees (up to
 # ~70 ft) are not clearable by height alone — players must miss crown laterally.
 # See PropertyManager tree-record comments for the design decision.
 const FLIGHT_ARC_PIXELS := 82.0
+# Presentation-only lift so longer flights read with clearer arcs; collision
+# still uses the FLIGHT_ARC_PIXELS estimate in find_curved_tree_contact.
+const VISUAL_ARC_SCALE := 1.28
 const FLIGHT_SHADOW_ALPHA := 0.26
 const FLIGHT_DISC_RADIUS := 4.0
 const SAVE_PATH := "user://dge_people_v1.json"
@@ -106,20 +115,17 @@ func setup(property_ref, course_ref, path_ref) -> void:
 
 
 func _boot_demo_visuals() -> void:
-	# Fast path for screenshots: ensure one playable hole, then tee a group.
+	# Fast path for screenshots: use starter layout (local coords), then tee a spaced group.
 	spawn_timer = 0.05
 	Engine.time_scale = 4.0
 	if completed_holes().is_empty() and course_manager != null and property_manager != null:
-		var center_local: Vector2 = property_manager.get_property_local_center()
-		var tee_local: Vector2 = clamp_to_property(center_local + Vector2(-140.0, 40.0))
-		var basket_local: Vector2 = clamp_to_property(center_local + Vector2(160.0, -30.0))
-		course_manager.set_tee(0, property_manager.property_local_to_world(tee_local))
-		course_manager.set_basket(0, property_manager.property_local_to_world(basket_local))
+		if course_manager.has_method("generate_starter_layout"):
+			course_manager.generate_starter_layout(property_manager)
 		refresh_course_locations()
 		if get_parent() != null and get_parent().has_node("CourseRenderer"):
 			var renderer = get_parent().get_node("CourseRenderer")
-			if renderer.has_method("request_redraw"):
-				renderer.request_redraw()
+			if renderer.has_method("refresh"):
+				renderer.refresh()
 			elif "redraw_requested" in renderer:
 				renderer.redraw_requested = true
 	await get_tree().create_timer(0.25).timeout
@@ -130,37 +136,52 @@ func _boot_demo_visuals() -> void:
 		var holes: Array = visitor["holes"]
 		if holes.is_empty():
 			continue
+		var hole_index: int = int(holes[0])
 		visitor["checked_in"] = true
 		visitor["tee_ready"] = true
 		visitor["stage"] = "throwing"
 		visitor["wait"] = 0.35
-		visitor["position"] = hole_local(int(holes[0]), "tee")
-		visitor["disc_position"] = visitor["position"]
+		visitor["disc_position"] = hole_local(hole_index, "tee")
 		visitor["car_position"] = visitor["parking_slot"]
+		hole_owners[hole_index] = int(visitor["group_id"])
+		group_turns[int(visitor["group_id"])] = int(get_group_members(visitor)[0]["id"])
+	# Space bodies: thrower on pad, partners held in waiting_group queue slots.
+	for visitor_value in visitors:
+		var visitor: Dictionary = visitor_value
+		var holes: Array = visitor["holes"]
+		if holes.is_empty():
+			continue
+		var hole_index: int = int(holes[0])
+		if int(visitor["id"]) == get_group_turn(visitor):
+			visitor["stage"] = "throwing"
+			visitor["active_thrower"] = true
+			visitor["position"] = get_tee_throw_stance(hole_index)
+			set_thought(visitor, "Tee's ours")
+		else:
+			visitor["stage"] = "waiting_group"
+			visitor["active_thrower"] = false
+			visitor["position"] = get_tee_queue_slot(hole_index, visitor, 0)
+			set_thought(visitor, "Waiting my turn")
 		visual_positions[int(visitor["id"])] = visitor["position"]
-		hole_owners[int(holes[0])] = int(visitor["group_id"])
-		set_thought(visitor, "Tee's ours")
 		focus_world = property_manager.property_local_to_world(visitor["position"])
 	var camera = get_parent().get_node_or_null("CameraController")
 	if camera != null and focus_world != Vector2.ZERO:
 		camera.position = focus_world
-		camera.zoom = Vector2(1.55, 1.55)
-	# Kick one clear drive so flight trails are easy to capture.
+		camera.zoom = Vector2(1.45, 1.45)
 	await get_tree().create_timer(0.55).timeout
 	for visitor_value in visitors:
 		var shooter: Dictionary = visitor_value
 		if str(shooter["stage"]) != "throwing":
 			continue
-		# Ensure tee-order allows this thrower even if group turn unset.
-		group_turns[int(shooter["group_id"])] = int(shooter["id"])
+		if int(shooter["id"]) != get_group_turn(shooter):
+			continue
 		shooter["tee_ready"] = true
 		shooter["shot_style"] = "Run-up"
 		shooter["shot_animation_total"] = 0.2
 		shooter["wait"] = 0.0
 		perform_throw(shooter)
 		finish_throw_turn(shooter)
-		# Stretch flight for readability in demos / screenshots.
-		shooter["flight_duration"] = maxf(float(shooter.get("flight_duration", 1.0)), 2.4)
+		shooter["flight_duration"] = maxf(float(shooter.get("flight_duration", 1.0)), 2.6)
 		set_thought(shooter, "Drive")
 		break
 	queue_redraw()
@@ -190,6 +211,84 @@ func get_checkin_local() -> Vector2:
 		var office_size: Vector2 = office.get("size", Vector2(52.0, 64.0))
 		return clamp_to_property(office_local + Vector2(office_size.x * 0.5 + 10.0, 0.0))
 	return get_parking_local()
+
+
+func group_member_rank(visitor: Dictionary) -> int:
+	var members: Array = get_group_members(visitor)
+	for i in range(members.size()):
+		if int(members[i]["id"]) == int(visitor["id"]):
+			return i
+	return 0
+
+
+func get_checkin_slot(visitor: Dictionary) -> Vector2:
+	# Fan along the office frontage so groups never share one pixel.
+	var base: Vector2 = get_checkin_local()
+	var rank: int = group_member_rank(visitor)
+	var group_shift: float = float(int(visitor["group_id"]) % 5) * 10.0
+	var lateral: float = (float(rank) - 1.5) * CHECKIN_SLOT_SPACING + group_shift
+	return clamp_to_property(base + Vector2(0.0, lateral))
+
+
+func get_tee_approach(hole_index: int) -> Vector2:
+	var tee: Vector2 = hole_local(hole_index, "tee")
+	var basket: Vector2 = hole_local(hole_index, "basket")
+	var away: Vector2 = (tee - basket).normalized()
+	if away.length_squared() < 0.001:
+		away = Vector2.DOWN
+	return away
+
+
+func get_tee_queue_slot(hole_index: int, visitor: Dictionary, queue_rank: int = 0) -> Vector2:
+	var tee: Vector2 = hole_local(hole_index, "tee")
+	var away: Vector2 = get_tee_approach(hole_index)
+	var side: Vector2 = Vector2(-away.y, away.x)
+	var rank: int = group_member_rank(visitor)
+	var members_n: int = maxi(1, get_group_members(visitor).size())
+	var center: float = (float(members_n) - 1.0) * 0.5
+	# Diagonal fan: wide lateral + staggered depth so large sprites don't overlap.
+	var back: float = TEE_QUEUE_BACK + float(queue_rank) * 40.0 + float(rank) * TEE_QUEUE_DEPTH
+	var lateral: float = (float(rank) - center) * TEE_QUEUE_LATERAL
+	return clamp_to_property(tee + away * back + side * lateral)
+
+
+func get_tee_throw_stance(hole_index: int) -> Vector2:
+	var tee: Vector2 = hole_local(hole_index, "tee")
+	return clamp_to_property(tee + get_tee_approach(hole_index) * 10.0)
+
+
+func get_basket_wait_slot(hole_index: int, visitor: Dictionary) -> Vector2:
+	var basket: Vector2 = hole_local(hole_index, "basket")
+	var tee: Vector2 = hole_local(hole_index, "tee")
+	var away: Vector2 = (basket - tee).normalized()
+	if away.length_squared() < 0.001:
+		away = Vector2.UP
+	var side: Vector2 = Vector2(-away.y, away.x)
+	var rank: int = group_member_rank(visitor)
+	var sign: float = -1.0 if rank % 2 == 0 else 1.0
+	var ring: float = BASKET_WAIT_RADIUS + float(int(rank / 2)) * 12.0
+	return clamp_to_property(basket + away * 14.0 + side * sign * ring)
+
+
+func tee_queue_rank_for(visitor: Dictionary, hole_index: int) -> int:
+	var owner: int = int(hole_owners.get(hole_index, -1))
+	if owner == -1 or owner == int(visitor["group_id"]):
+		return 0
+	var seen: Dictionary = {}
+	var order: Array = []
+	for value in visitors:
+		var other: Dictionary = value
+		if int(other["holes"][int(other["hole_cursor"])]) != hole_index:
+			continue
+		if str(other["stage"]) not in ["walking_to_tee", "waiting_at_tee"]:
+			continue
+		var gid: int = int(other["group_id"])
+		if seen.has(gid):
+			continue
+		seen[gid] = true
+		order.append(gid)
+	var idx: int = order.find(int(visitor["group_id"]))
+	return maxi(1, idx)
 
 
 func get_parking_slot(slot_index: int) -> Vector2:
@@ -319,7 +418,7 @@ func coordinate_group_lies() -> void:
 				var sign: float = -1.0 if waiting_index % 2 == 0 else 1.0
 				var rank: int = int(waiting_index / 2)
 				var angle: float = deg_to_rad(28.0 + float(rank) * 15.0)
-				destination += (away * cos(angle) + side * sin(angle) * sign) * (GROUP_WAIT_RADIUS + float(rank) * 10.0)
+				destination += (away * cos(angle) + side * sin(angle) * sign) * (GROUP_WAIT_RADIUS + float(rank) * GROUP_WAIT_SPACING)
 				waiting_index += 1
 				set_thought(member, "Walk to the lie")
 			set_destination(member, destination)
@@ -349,8 +448,9 @@ func move_group_to_next_hole(visitor: Dictionary) -> void:
 		member["strokes"] = 0
 		member["hole_cursor"] = cursor + 1
 		if cursor + 1 < itinerary.size():
+			var next_hole: int = int(itinerary[cursor + 1])
 			member["stage"] = "walking_to_tee"
-			set_destination(member, hole_local(int(itinerary[cursor + 1]), "tee"))
+			set_destination(member, get_tee_queue_slot(next_hole, member, tee_queue_rank_for(member, next_hole)))
 		else:
 			member["stage"] = "feedback"
 			member["wait"] = FEEDBACK_SECONDS
@@ -524,28 +624,62 @@ func _process(delta: float) -> void:
 			"waiting_partner":
 				set_thought(visitor, "Waiting on partner")
 				visitor["stage"] = "walking_to_checkin"
-				set_destination(visitor, get_checkin_local())
+				set_destination(visitor, get_checkin_slot(visitor))
 			"waiting_at_checkin":
 				if group_all_at_stage(visitor, "waiting_at_checkin"):
 					for member in get_group_members(visitor):
 						member["checked_in"] = true
 						member["stage"] = "walking_to_tee"
 						set_thought(member, "Checked in — to the tee")
-						set_destination(member, hole_local(int(member["holes"][0]), "tee"))
+						var first_hole: int = int(member["holes"][0])
+						set_destination(member, get_tee_queue_slot(first_hole, member, tee_queue_rank_for(member, first_hole)))
 			"waiting_at_tee":
 				if bool(visitor.get("checked_in", false)) and group_ready_for_tee(visitor):
 					var hole_index: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 					var owner: int = int(hole_owners.get(hole_index, -1))
 					if owner == -1 or owner == int(visitor["group_id"]):
 						hole_owners[hole_index] = int(visitor["group_id"])
+						var turn_id: int = get_group_turn(visitor)
 						for member in get_group_members(visitor):
 							member["tee_ready"] = true
 							member["disc_position"] = hole_local(hole_index, "tee")
-							member["stage"] = "throwing"
-							member["wait"] = TEE_PREPARE_SECONDS
-							set_thought(member, "Tee's ours")
+							if int(member["id"]) == turn_id:
+								member["stage"] = "throwing"
+								member["wait"] = TEE_PREPARE_SECONDS
+								member["position"] = get_tee_throw_stance(hole_index)
+								member["active_thrower"] = true
+								set_thought(member, "Tee's ours")
+							else:
+								# Stay in a spaced queue — never share the thrower's pad.
+								member["stage"] = "waiting_group"
+								member["active_thrower"] = false
+								member["lie_ready"] = false
+								member["position"] = get_tee_queue_slot(hole_index, member, 0)
+								set_thought(member, "Waiting my turn", 1.8)
+							visual_positions[int(member["id"])] = member["position"]
 					else:
+						# Keep queued groups spaced behind the active group.
+						var qrank: int = tee_queue_rank_for(visitor, hole_index)
+						var spaced: Vector2 = get_tee_queue_slot(hole_index, visitor, qrank)
+						if visitor["position"].distance_to(spaced) > 8.0:
+							set_destination(visitor, spaced)
 						set_thought(visitor, "Tee queue…")
+			"waiting_group":
+				# Tee-order promotion: next thrower leaves the spaced queue for the pad.
+				if int(visitor["strokes"]) == 0 and bool(visitor.get("tee_ready", false)):
+					if get_group_turn(visitor) == int(visitor["id"]) and may_throw(visitor):
+						var promote_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
+						visitor["stage"] = "throwing"
+						visitor["active_thrower"] = true
+						visitor["position"] = get_tee_throw_stance(promote_hole)
+						visual_positions[int(visitor["id"])] = visitor["position"]
+						visitor["wait"] = BETWEEN_SHOTS_SECONDS
+						set_thought(visitor, "My tee")
+					else:
+						var hold_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
+						var hold_slot: Vector2 = get_tee_queue_slot(hold_hole, visitor, tee_queue_rank_for(visitor, hold_hole))
+						visitor["position"] = hold_slot
+						visual_positions[int(visitor["id"])] = hold_slot
 			"waiting_group_lie":
 				var members: Array = get_group_members(visitor)
 				var all_arrived: bool = true
@@ -578,16 +712,21 @@ func _process(delta: float) -> void:
 					set_destination(visitor, visitor["parking_slot"])
 				elif str(visitor.get("blocked_goal", "")) == "basket":
 					visitor["stage"] = "walking_to_basket"
-					set_destination(visitor, hole_local(int(visitor["holes"][int(visitor["hole_cursor"])]), "basket"))
+					set_destination(visitor, get_basket_wait_slot(int(visitor["holes"][int(visitor["hole_cursor"])]), visitor))
 				elif str(visitor.get("blocked_goal", "")) == "lie":
 					visitor["stage"] = "walking_to_lie"
 					set_destination(visitor, visitor["disc_position"])
 				else:
+					var retry_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 					visitor["stage"] = "walking_to_tee"
-					set_destination(visitor, hole_local(int(visitor["holes"][int(visitor["hole_cursor"])]), "tee"))
+					set_destination(visitor, get_tee_queue_slot(retry_hole, visitor, tee_queue_rank_for(visitor, retry_hole)))
 			"throwing":
 				if may_throw(visitor):
 					var hole_index: int = int(visitor["holes"][int(visitor["hole_cursor"])])
+					# Active thrower stands on the pad, not in the queue pile.
+					visitor["position"] = get_tee_throw_stance(hole_index) if int(visitor["strokes"]) == 0 else visitor["position"]
+					if int(visitor["strokes"]) == 0:
+						visual_positions[int(visitor["id"])] = visitor["position"]
 					var distance_feet: float = (visitor["disc_position"] as Vector2).distance_to(hole_local(hole_index, "basket")) * FEET_PER_PIXEL
 					var golfer: Dictionary = people[int(visitor["id"])]
 					var skills: Dictionary = golfer["skills"]
@@ -605,6 +744,13 @@ func _process(delta: float) -> void:
 					else:
 						set_thought(visitor, "Run-up…")
 				else:
+					# Hold non-throwers in their queue slots instead of stacking on the pad.
+					if int(visitor["strokes"]) == 0:
+						var wait_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
+						var slot: Vector2 = get_tee_queue_slot(wait_hole, visitor, tee_queue_rank_for(visitor, wait_hole))
+						if visitor["position"].distance_to(slot) > 10.0:
+							visitor["position"] = slot
+							visual_positions[int(visitor["id"])] = slot
 					set_thought(visitor, "Clear the fairway…", 1.2)
 			"standstill", "run_up":
 				perform_throw(visitor)
@@ -1087,7 +1233,8 @@ func get_flight_visual(visitor: Dictionary) -> Vector2:
 	var start: Vector2 = visitor["flight_start"]
 	var finish: Vector2 = visitor["flight_end"]
 	var ground: Vector2 = get_flight_ground_point(start, finish, t, float(visitor.get("flight_curve", 0.0)), float(visitor.get("flight_turn", 0.0)), float(visitor.get("flight_fade", 0.0)))
-	var arc: float = sin(PI * t) * minf(FLIGHT_ARC_PIXELS, 14.0 + start.distance_to(finish) * 0.19)
+	# Visual arc only — collision height stays on FLIGHT_ARC_PIXELS estimate.
+	var arc: float = sin(PI * t) * minf(FLIGHT_ARC_PIXELS * VISUAL_ARC_SCALE, 18.0 + start.distance_to(finish) * 0.26)
 	return ground + Vector2(0.0, -arc)
 
 
@@ -1103,6 +1250,9 @@ func finish_hole(visitor: Dictionary) -> void:
 	visitor["round_scores"][str(hole_index + 1)] = {"strokes": strokes, "par": par}
 	person["holes_visited"] = int(person["holes_visited"]) + 1
 	visitor["stage"] = "waiting_at_basket"
+	var wait_slot: Vector2 = get_basket_wait_slot(hole_index, visitor)
+	visitor["position"] = wait_slot
+	visual_positions[int(visitor["id"])] = wait_slot
 	var relative: int = strokes - par
 	if relative <= -1:
 		set_thought(visitor, "Under par!")

@@ -1843,11 +1843,12 @@ func draw_flight_path(
 
 	var width := PATH_WIDTH_NORMAL
 
+	# Soft guide path so live orange flight trails remain the readable throw cue.
 	var line_color := Color(
-		1.0,
-		1.0,
-		1.0,
-		0.72
+		0.92,
+		0.94,
+		0.88,
+		0.34
 	)
 
 	if is_selected:
@@ -1855,10 +1856,10 @@ func draw_flight_path(
 		width = PATH_WIDTH_SELECTED
 
 		line_color = Color(
-			1.0,
-			1.0,
-			1.0,
-			0.96
+			0.95,
+			0.97,
+			0.92,
+			0.55
 		)
 
 	for i in range(

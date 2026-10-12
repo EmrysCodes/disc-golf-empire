@@ -75,8 +75,11 @@ func sync_visitor(visitor: Dictionary, person: Dictionary, body_world: Vector2, 
 			var ground_local: Vector2 = _flight_ground(visitor, progress)
 			var disc_world: Vector2 = property_manager.property_local_to_world(disc_local)
 			var ground_world: Vector2 = property_manager.property_local_to_world(ground_local)
-			disc.set_flight(disc_world, ground_world, progress)
-			_append_trail(id, disc_world)
+			var heading: Vector2 = _flight_heading(visitor, progress)
+			disc.set_flight(disc_world, ground_world, progress, heading)
+			# Trail follows the curved ground track (readable vs white design path + altitude).
+			var trail_world: Vector2 = ground_world + Vector2(0.0, -4.0) + (disc_world - ground_world) * 0.35
+			_append_trail(id, trail_world)
 		else:
 			var lie_world: Vector2 = property_manager.property_local_to_world(visitor["disc_position"])
 			disc.set_lie(lie_world)
@@ -263,12 +266,15 @@ func _release_trail(id: int, fade: bool) -> void:
 
 
 func _flight_visual(visitor: Dictionary) -> Vector2:
+	var parent = get_parent()
+	if parent != null and parent.has_method("get_flight_visual"):
+		return parent.get_flight_visual(visitor)
 	var duration: float = maxf(0.01, float(visitor.get("flight_duration", 1.0)))
 	var t: float = clampf(float(visitor.get("flight_elapsed", 0.0)) / duration, 0.0, 1.0)
 	var start: Vector2 = visitor["flight_start"]
 	var finish: Vector2 = visitor["flight_end"]
 	var ground: Vector2 = _flight_ground(visitor, t)
-	var arc: float = sin(PI * t) * minf(82.0, 14.0 + start.distance_to(finish) * 0.19)
+	var arc: float = sin(PI * t) * minf(105.0, 18.0 + start.distance_to(finish) * 0.26)
 	return ground + Vector2(0.0, -arc)
 
 
@@ -282,3 +288,14 @@ func _flight_ground(visitor: Dictionary, t: float) -> Vector2:
 	if parent != null and parent.has_method("get_flight_ground_point"):
 		return parent.get_flight_ground_point(start, finish, t, curve, turn, fade)
 	return start.lerp(finish, t)
+
+
+func _flight_heading(visitor: Dictionary, t: float) -> Vector2:
+	var t0: float = clampf(t - 0.04, 0.0, 1.0)
+	var t1: float = clampf(t + 0.04, 0.0, 1.0)
+	var a: Vector2 = _flight_ground(visitor, t0)
+	var b: Vector2 = _flight_ground(visitor, t1)
+	var delta: Vector2 = b - a
+	if delta.length_squared() < 0.001:
+		delta = (visitor["flight_end"] as Vector2) - (visitor["flight_start"] as Vector2)
+	return delta.normalized() if delta.length_squared() > 0.001 else Vector2.RIGHT

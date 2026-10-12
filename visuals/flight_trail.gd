@@ -1,11 +1,11 @@
 # Pooled Line2D trail that follows a disc in flight, then fades out.
 extends Line2D
 
-const MAX_POINTS := 64
-const FADE_SECONDS := 0.7
-const ACTIVE_WIDTH := 6.5
-# Distinct from the authored white hole path so live throws read clearly.
-const ACTIVE_COLOR := Color(1.0, 0.42, 0.08, 0.92)
+const MAX_POINTS := 72
+const FADE_SECONDS := 0.85
+const ACTIVE_WIDTH := 5.8
+# Warm amber — distinct from the softer authored fairway guide path.
+const ACTIVE_COLOR := Color(1.0, 0.55, 0.12, 0.95)
 
 var active: bool = false
 var fading: bool = false
@@ -41,7 +41,7 @@ func begin_trail(id: int, start_world: Vector2) -> void:
 func append_world(point: Vector2) -> void:
 	if not active or fading:
 		return
-	if get_point_count() > 0 and get_point_position(get_point_count() - 1).distance_to(point) < 2.0:
+	if get_point_count() > 0 and get_point_position(get_point_count() - 1).distance_to(point) < 1.2:
 		return
 	add_point(point)
 	while get_point_count() > MAX_POINTS:
