@@ -1,4 +1,6 @@
-# Disc Golf Empire - Update 42: height-aware trees and curved-flight collision.
+# Disc Golf Empire - Update 43: shared tree records for visuals + collision.
+# Update 42 altitude/crown/trunk collision retained; dimensions come from
+# PropertyManager tree_records (no position-hash get_tree_dimensions).
 # Based on the working Update 30 arrival/check-in/navigation system.
 extends Node2D
 
@@ -36,6 +38,9 @@ const RUNUP_SECONDS := 1.05
 const GROUP_WAIT_RADIUS := 25.0
 const FLIGHT_MIN_SECONDS := 0.65
 const FLIGHT_MAX_SECONDS := 2.3
+# ~38 ft apex at FEET_PER_PIXEL. Update 43 keeps this arc: tall trees (up to
+# ~70 ft) are not clearable by height alone — players must miss crown laterally.
+# See PropertyManager tree-record comments for the design decision.
 const FLIGHT_ARC_PIXELS := 82.0
 const FLIGHT_SHADOW_ALPHA := 0.26
 const FLIGHT_DISC_RADIUS := 4.0
@@ -614,7 +619,11 @@ func plan_obstacle_aware_shot(visitor: Dictionary, lie: Vector2, basket: Vector2
 			if distance < RECOVERY_MIN_ADVANCE:
 				continue
 			var estimated_height: float = minf(FLIGHT_ARC_PIXELS, 14.0 + distance * 0.19)
-			var collision: Dictionary = find_tree_contact(lie, candidate, estimated_height)
+			# Same shared contact sampler as throws (straight planning line;
+			# release shape is unknown at plan time).
+			var collision: Dictionary = find_curved_tree_contact(
+				lie, candidate, estimated_height, 0.0, 0.0, 0.0
+			)
 			var hit_fraction: float = float(collision.get("fraction", 1.0))
 			var safe_distance: float = distance * hit_fraction
 			# Favor progress along the designer's intended fairway, while
@@ -762,27 +771,20 @@ func advance_visitor(visitor: Dictionary, delta: float) -> bool:
 # Distances are property-local pixels; 32 px represents 15 real feet.
 # A recreational player's drive typically travels farther than the old 24-264 px range.
 # This is a gameplay approximation, not a full aerodynamic physics simulation.
-# Each tree has a persistent, position-derived height and crown size. Heights
-# are expressed in feet, while the map uses property-local pixels.
-# The property currently stores tree positions only, so these characteristics
-# are derived deterministically until explicit tree records are introduced.
-func get_tree_dimensions(tree: Vector2) -> Dictionary:
-	var seed_value: int = absi(int(roundf(tree.x * 17.0 + tree.y * 31.0)))
-	var height_feet: float = 28.0 + float(seed_value % 43) # 28-70 ft
-	var crown_radius: float = 12.0 + float((seed_value / 7) % 9) # 12-20 px
-	return {"height_feet": height_feet, "crown_radius": crown_radius, "trunk_radius": 4.5}
-
-
-func tree_intersects_disc(tree: Vector2, disc_ground: Vector2, altitude_pixels: float) -> bool:
-	var dimensions: Dictionary = get_tree_dimensions(tree)
-	var height_pixels: float = float(dimensions["height_feet"]) / FEET_PER_PIXEL
-	# The crown spans the upper 65% of the tree; the trunk is narrower.
-	var crown_base: float = height_pixels * 0.35
+# Tree height / crown / trunk come from PropertyManager.tree_records (Update 43).
+func tree_intersects_disc(tree_record: Dictionary, disc_ground: Vector2, altitude_pixels: float) -> bool:
+	if tree_record.is_empty():
+		return false
+	var tree: Vector2 = tree_record["position"]
+	var height_pixels: float = float(tree_record["height_feet"]) / FEET_PER_PIXEL
+	# The crown spans the upper (1 - crown_base_ratio) of the tree; trunk below.
+	var crown_base_ratio: float = float(tree_record.get("crown_base_ratio", 0.35))
+	var crown_base: float = height_pixels * crown_base_ratio
 	var lateral: float = tree.distance_to(disc_ground)
 	if altitude_pixels <= height_pixels and altitude_pixels >= crown_base:
-		return lateral <= float(dimensions["crown_radius"])
+		return lateral <= float(tree_record["crown_radius_px"])
 	if altitude_pixels < crown_base:
-		return lateral <= float(dimensions["trunk_radius"])
+		return lateral <= float(tree_record["trunk_radius_px"])
 	return false
 
 
@@ -801,17 +803,24 @@ func find_tree_contact(start: Vector2, finish: Vector2, flight_height: float) ->
 func find_curved_tree_contact(start: Vector2, finish: Vector2, height: float, curve: float, turn: float, fade: float) -> Dictionary:
 	if start.distance_squared_to(finish) < 0.01:
 		return {}
+	if property_manager == null:
+		return {}
 	# Sample densely enough to avoid tunneling through narrow trunks.
 	var steps: int = maxi(24, int(ceilf(start.distance_to(finish) / 4.0)))
 	var previous: Vector2 = start
+	var records: Array = property_manager.tree_records
 	for step in range(1, steps + 1):
 		var t: float = float(step) / float(steps)
 		var current: Vector2 = get_flight_ground_point(start, finish, t, curve, turn, fade)
 		var altitude_pixels: float = sin(PI * t) * height
-		for tree_value in property_manager.trees:
-			var tree: Vector2 = tree_value
-			if tree_intersects_disc(tree, current, altitude_pixels):
-				return {"fraction": t, "point": previous, "tree": tree}
+		for record_value in records:
+			var tree_record: Dictionary = record_value
+			if tree_intersects_disc(tree_record, current, altitude_pixels):
+				return {
+					"fraction": t,
+					"point": previous,
+					"tree": tree_record["position"],
+				}
 		previous = current
 	return {}
 

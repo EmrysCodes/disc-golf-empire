@@ -48,6 +48,33 @@ var rng := RandomNumberGenerator.new()
 
 var terrain: Array = []
 
+# Update 43 — shared tree records (source of truth).
+# Schema per record:
+#   position: Vector2          property-local (or world for world trees)
+#   scale: float               economy / visual weight
+#   height_feet: float         physical height for altitude collision
+#   trunk_radius_px: float     matches drawn trunk
+#   crown_radius_px: float     matches drawn crown
+#   crown_base_ratio: float    trunk below this fraction of height; canopy above
+#
+# Flight-arc decision: keep GolferManager FLIGHT_ARC_PIXELS (~38 ft apex).
+# Trees generate across ~28–70 ft. Full drives can clear shorter canopy;
+# taller trees require a lateral miss. Raising the arc made flights floaty;
+# clamping all heights to a clearable band made the park feel like scrub.
+# Limited height clearance matches recreational disc golf and preserves
+# Update 42 altitude/crown/trunk collision behavior.
+const TREE_SCALE_MIN := 0.75
+const TREE_SCALE_MAX := 1.35
+const WORLD_TREE_SCALE_MIN := 0.70
+const WORLD_TREE_SCALE_MAX := 1.45
+const TREE_HEIGHT_FEET_MIN := 28.0
+const TREE_HEIGHT_FEET_MAX := 70.0
+const TREE_CROWN_BASE_RATIO := 0.35
+const TREE_TRUNK_RADIUS_BASE := 4.0
+const TREE_CROWN_RADIUS_BASE := 18.0
+
+var tree_records: Array[Dictionary] = []
+# Compatibility mirrors — kept in lockstep with tree_records.
 var trees: Array[Vector2] = []
 var tree_sizes: Array[float] = []
 
@@ -62,6 +89,8 @@ var brush_sizes: Array[float] = []
 # SURROUNDING WORLD DATA
 # ==================================================
 
+var world_tree_records: Array[Dictionary] = []
+# Compatibility mirrors — kept in lockstep with world_tree_records.
 var world_trees: Array[Vector2] = []
 var world_tree_sizes: Array[float] = []
 
@@ -100,6 +129,7 @@ func generate_property(seed_value: int) -> void:
 
 	terrain.clear()
 
+	tree_records.clear()
 	trees.clear()
 	tree_sizes.clear()
 
@@ -109,6 +139,7 @@ func generate_property(seed_value: int) -> void:
 	brush_clusters.clear()
 	brush_sizes.clear()
 
+	world_tree_records.clear()
 	world_trees.clear()
 	world_tree_sizes.clear()
 
@@ -383,6 +414,42 @@ func generate_scattered_trees() -> void:
 		add_tree(local_position)
 
 
+func make_tree_record(
+	position: Vector2,
+	tree_scale: float,
+	scale_min: float = TREE_SCALE_MIN,
+	scale_max: float = TREE_SCALE_MAX
+) -> Dictionary:
+	var clamped_scale: float = clampf(
+		tree_scale,
+		scale_min,
+		scale_max
+	)
+	var height_t: float = inverse_lerp(
+		scale_min,
+		scale_max,
+		clamped_scale
+	)
+	# Mild noise so identical scales are not identical heights.
+	var height_feet: float = clampf(
+		lerpf(
+			TREE_HEIGHT_FEET_MIN,
+			TREE_HEIGHT_FEET_MAX,
+			height_t
+		) + rng.randf_range(-3.0, 3.0),
+		TREE_HEIGHT_FEET_MIN,
+		TREE_HEIGHT_FEET_MAX
+	)
+	return {
+		"position": position,
+		"scale": clamped_scale,
+		"height_feet": height_feet,
+		"trunk_radius_px": TREE_TRUNK_RADIUS_BASE * clamped_scale,
+		"crown_radius_px": TREE_CROWN_RADIUS_BASE * clamped_scale,
+		"crown_base_ratio": TREE_CROWN_BASE_RATIO,
+	}
+
+
 func add_tree(local_position: Vector2) -> void:
 	var cell: Vector2i = world_to_cell(
 		local_position
@@ -397,14 +464,17 @@ func add_tree(local_position: Vector2) -> void:
 	if terrain[cell.y][cell.x] == WATER:
 		return
 
-	trees.append(local_position)
-
-	tree_sizes.append(
-		rng.randf_range(
-			0.75,
-			1.35
-		)
+	var tree_scale: float = rng.randf_range(
+		TREE_SCALE_MIN,
+		TREE_SCALE_MAX
 	)
+	var record: Dictionary = make_tree_record(
+		local_position,
+		tree_scale
+	)
+	tree_records.append(record)
+	trees.append(local_position)
+	tree_sizes.append(tree_scale)
 
 
 # ==================================================
@@ -1125,8 +1195,12 @@ func generate_starter_facilities() -> void:
 				terrain[y][x] = DIRT
 		for i in range(trees.size() - 1, -1, -1):
 			if clearance.has_point(property_local_to_world(trees[i])):
+				# Keep tree_records / trees / tree_sizes in lockstep.
 				trees.remove_at(i)
-				tree_sizes.remove_at(i)
+				if i < tree_sizes.size():
+					tree_sizes.remove_at(i)
+				if i < tree_records.size():
+					tree_records.remove_at(i)
 		for i in range(bushes.size() - 1, -1, -1):
 			if clearance.has_point(property_local_to_world(bushes[i])):
 				bushes.remove_at(i)
@@ -1228,6 +1302,7 @@ func generate_walking_trail() -> void:
 # ==================================================
 
 func generate_surrounding_world() -> void:
+	world_tree_records.clear()
 	world_trees.clear()
 	world_tree_sizes.clear()
 
@@ -1332,16 +1407,19 @@ func create_world_tree_cluster(
 func add_world_tree(
 	world_position: Vector2
 ) -> void:
-	world_trees.append(
-		world_position
+	var tree_scale: float = rng.randf_range(
+		WORLD_TREE_SCALE_MIN,
+		WORLD_TREE_SCALE_MAX
 	)
-
-	world_tree_sizes.append(
-		rng.randf_range(
-			0.70,
-			1.45
-		)
+	var record: Dictionary = make_tree_record(
+		world_position,
+		tree_scale,
+		WORLD_TREE_SCALE_MIN,
+		WORLD_TREE_SCALE_MAX
 	)
+	world_tree_records.append(record)
+	world_trees.append(world_position)
+	world_tree_sizes.append(tree_scale)
 
 
 # ==================================================
@@ -1569,20 +1647,19 @@ func find_property_tree_at_world_position(
 	var best_tree_index: int = -1
 	var best_distance: float = INF
 
-	for i in range(trees.size()):
-		if i >= tree_sizes.size():
-			continue
-
-		var tree_scale: float = tree_sizes[i]
-
+	for i in range(tree_records.size()):
+		var record: Dictionary = tree_records[i]
+		var crown_radius: float = float(
+			record.get("crown_radius_px", TREE_CROWN_RADIUS_BASE)
+		)
 		var hit_radius: float = max(
 			24.0,
-			18.0 * tree_scale + 10.0
+			crown_radius + 10.0
 		)
 
 		var distance: float = (
 			local_position.distance_to(
-				trees[i]
+				record["position"]
 			)
 		)
 
@@ -1594,6 +1671,22 @@ func find_property_tree_at_world_position(
 			best_tree_index = i
 
 	return best_tree_index
+
+
+func get_tree_record(
+	tree_index: int
+) -> Dictionary:
+	if (
+		tree_index < 0
+		or tree_index >= tree_records.size()
+	):
+		return {}
+
+	return tree_records[tree_index]
+
+
+func get_tree_record_count() -> int:
+	return tree_records.size()
 
 
 func get_property_tree_size(
@@ -1615,6 +1708,7 @@ func remove_property_tree(
 		tree_index < 0
 		or tree_index >= trees.size()
 		or tree_index >= tree_sizes.size()
+		or tree_index >= tree_records.size()
 	):
 		return false
 
@@ -1623,6 +1717,10 @@ func remove_property_tree(
 	)
 
 	tree_sizes.remove_at(
+		tree_index
+	)
+
+	tree_records.remove_at(
 		tree_index
 	)
 
