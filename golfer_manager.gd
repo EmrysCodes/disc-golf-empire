@@ -33,8 +33,9 @@ const CLOSE_PUTT_RANGE_PIXELS := 22.0
 const STANDSTILL_BASE_FEET := 95.0
 const STANDSTILL_MIN_FEET := 55.0
 const STANDSTILL_MAX_FEET := 140.0
-const STANDSTILL_SECONDS := 0.45
-const RUNUP_SECONDS := 1.05
+# Long enough for Kenney throw/putt strips to play through (not a one-frame blink).
+const STANDSTILL_SECONDS := 0.72
+const RUNUP_SECONDS := 1.15
 const GROUP_WAIT_RADIUS := 25.0
 const TEE_QUEUE_BACK := 56.0
 const TEE_QUEUE_LATERAL := 96.0
@@ -115,9 +116,9 @@ func setup(property_ref, course_ref, path_ref) -> void:
 
 
 func _boot_demo_visuals() -> void:
-	# Fast path for screenshots: use starter layout (local coords), then tee a spaced group.
+	# Anim showcase: walk → prepare → run-up/throw → disc flight (readable time scale).
 	spawn_timer = 0.05
-	Engine.time_scale = 4.0
+	Engine.time_scale = 1.35
 	if completed_holes().is_empty() and course_manager != null and property_manager != null:
 		if course_manager.has_method("generate_starter_layout"):
 			course_manager.generate_starter_layout(property_manager)
@@ -139,13 +140,32 @@ func _boot_demo_visuals() -> void:
 		var hole_index: int = int(holes[0])
 		visitor["checked_in"] = true
 		visitor["tee_ready"] = true
-		visitor["stage"] = "throwing"
-		visitor["wait"] = 0.35
 		visitor["disc_position"] = hole_local(hole_index, "tee")
 		visitor["car_position"] = visitor["parking_slot"]
 		hole_owners[hole_index] = int(visitor["group_id"])
 		group_turns[int(visitor["group_id"])] = int(get_group_members(visitor)[0]["id"])
-	# Space bodies: thrower on pad, partners held in waiting_group queue slots.
+	# Beat 1 — walk toward tee so walk cycle is visible.
+	for visitor_value in visitors:
+		var visitor: Dictionary = visitor_value
+		var holes: Array = visitor["holes"]
+		if holes.is_empty():
+			continue
+		var hole_index: int = int(holes[0])
+		var tee_slot: Vector2 = get_tee_queue_slot(hole_index, visitor, tee_queue_rank_for(visitor, hole_index))
+		var start_pos: Vector2 = tee_slot + Vector2(-70.0 - float(int(visitor["id"]) % 3) * 18.0, 28.0)
+		visitor["position"] = start_pos
+		visual_positions[int(visitor["id"])] = start_pos
+		visitor["stage"] = "walking_to_tee"
+		visitor["wait"] = 0.0
+		set_destination(visitor, tee_slot)
+		set_thought(visitor, "Walking to tee")
+		focus_world = property_manager.property_local_to_world(tee_slot)
+	var camera = get_parent().get_node_or_null("CameraController")
+	if camera != null and focus_world != Vector2.ZERO:
+		camera.position = focus_world
+		camera.zoom = Vector2(1.55, 1.55)
+	await get_tree().create_timer(1.35).timeout
+	# Beat 2 — thrower prepares on pad; partners idle in spaced queue.
 	for visitor_value in visitors:
 		var visitor: Dictionary = visitor_value
 		var holes: Array = visitor["holes"]
@@ -155,20 +175,18 @@ func _boot_demo_visuals() -> void:
 		if int(visitor["id"]) == get_group_turn(visitor):
 			visitor["stage"] = "throwing"
 			visitor["active_thrower"] = true
+			visitor["wait"] = 1.1
 			visitor["position"] = get_tee_throw_stance(hole_index)
 			set_thought(visitor, "Tee's ours")
 		else:
 			visitor["stage"] = "waiting_group"
 			visitor["active_thrower"] = false
+			visitor["wait"] = 0.0
 			visitor["position"] = get_tee_queue_slot(hole_index, visitor, 0)
 			set_thought(visitor, "Waiting my turn")
 		visual_positions[int(visitor["id"])] = visitor["position"]
-		focus_world = property_manager.property_local_to_world(visitor["position"])
-	var camera = get_parent().get_node_or_null("CameraController")
-	if camera != null and focus_world != Vector2.ZERO:
-		camera.position = focus_world
-		camera.zoom = Vector2(1.45, 1.45)
-	await get_tree().create_timer(0.55).timeout
+	await get_tree().create_timer(1.2).timeout
+	# Beat 3 — natural run-up → throw → disc_flying (do not skip anim wait).
 	for visitor_value in visitors:
 		var shooter: Dictionary = visitor_value
 		if str(shooter["stage"]) != "throwing":
@@ -177,12 +195,10 @@ func _boot_demo_visuals() -> void:
 			continue
 		shooter["tee_ready"] = true
 		shooter["shot_style"] = "Run-up"
-		shooter["shot_animation_total"] = 0.2
-		shooter["wait"] = 0.0
-		perform_throw(shooter)
-		finish_throw_turn(shooter)
-		shooter["flight_duration"] = maxf(float(shooter.get("flight_duration", 1.0)), 2.6)
-		set_thought(shooter, "Drive")
+		shooter["stage"] = "run_up"
+		shooter["shot_animation_total"] = RUNUP_SECONDS
+		shooter["wait"] = RUNUP_SECONDS
+		set_thought(shooter, "Run-up…")
 		break
 	queue_redraw()
 
@@ -1353,6 +1369,7 @@ func sync_actor_visuals(delta: float) -> void:
 		var facing_x: float = 1.0
 		if visitor.has("destination"):
 			facing_x = (visitor["destination"] as Vector2 - local_position).x
+		var shot_progress: float = -1.0
 		if stage in ["run_up", "standstill", "throwing", "disc_flying"]:
 			var current_hole: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 			var basket: Vector2 = hole_local(current_hole, "basket")
@@ -1361,18 +1378,18 @@ func sync_actor_visuals(delta: float) -> void:
 			if heading.length_squared() < 0.01:
 				heading = Vector2.RIGHT
 			facing_x = heading.x
-			var total: float = maxf(0.01, float(visitor.get("shot_animation_total", 1.0)))
-			var progress: float = 1.0 - clampf(float(visitor["wait"]) / total, 0.0, 1.0)
+			var anim_total: float = maxf(0.01, float(visitor.get("shot_animation_total", 1.0)))
+			shot_progress = 1.0 - clampf(float(visitor["wait"]) / anim_total, 0.0, 1.0)
 			if stage == "run_up":
-				body += heading * (-16.0 * (1.0 - progress))
-				body += Vector2(0.0, sin(progress * PI * 5.0) * 1.6)
+				body += heading * (-16.0 * (1.0 - shot_progress))
+				body += Vector2(0.0, sin(shot_progress * PI * 5.0) * 1.6)
 			elif stage == "standstill":
-				body += heading * (-2.5 + progress * 2.5)
+				body += heading * (-2.5 + shot_progress * 2.5)
 		var putting: bool = bool(visitor.get("flight_putting", false))
 		if stage in ["throwing", "standstill", "run_up"] and int(visitor["hole_cursor"]) < visitor["holes"].size():
 			var hole_i: int = int(visitor["holes"][int(visitor["hole_cursor"])])
 			putting = (visitor["disc_position"] as Vector2).distance_to(hole_local(hole_i, "basket")) <= PUTT_RANGE_PIXELS
-		visual_layer.sync_visitor(visitor, person, body, facing_x, putting)
+		visual_layer.sync_visitor(visitor, person, body, facing_x, putting, shot_progress)
 	visual_layer.prune_to_visitors(live)
 	visual_layer.tick(delta)
 

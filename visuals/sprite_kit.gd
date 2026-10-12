@@ -16,13 +16,15 @@ const GOLFER_VARIANTS := [
 ]
 
 # Pose names mapped to gameplay anims (Kenney Toon Characters Pack 1).
+# Avoid "side" in idle — different facing reads as a pop. Stretch throw/putt
+# so release isn't a single-frame blink at standstill/run-up durations.
 const ANIM_POSE_MAP := {
-	"idle": ["idle", "idle", "think", "idle", "side", "idle"],
+	"idle": ["idle", "idle", "think", "idle", "idle", "idle"],
 	"walk": ["walk0", "walk1", "walk2", "walk3", "walk4", "walk5", "walk6", "walk7"],
-	"prepare": ["hold", "think", "hold", "wide"],
-	"run_up": ["run0", "run1", "run2", "run1", "run0", "run2"],
-	"throw": ["hold", "attack0", "attack1", "attack2", "wide", "cheer0"],
-	"putt": ["duck", "hold", "interact", "wide", "duck"],
+	"prepare": ["hold", "hold", "think", "hold", "wide", "hold"],
+	"run_up": ["run0", "run1", "run2", "run1", "run2", "run0", "run1", "run2"],
+	"throw": ["hold", "attack0", "attack1", "attack2", "attack2", "wide"],
+	"putt": ["duck", "hold", "interact", "interact", "wide", "duck"],
 }
 
 const DISC_SPIN_PATHS := [
@@ -52,9 +54,12 @@ static func ensure_ready() -> void:
 	_shadow_texture = _make_shadow_texture()
 	_asset_discs = _try_load_disc_frames()
 	if not _asset_discs:
+		push_warning("SpriteKit: disc PNGs missing — using procedural disc frames")
 		_disc_texture = _make_disc_texture(0.0, 1.0)
 		_disc_frames = _make_disc_frames()
 	_asset_golfers = _probe_golfer_assets()
+	if not _asset_golfers:
+		push_warning("SpriteKit: Kenney golfer PNGs missing — using procedural blobs")
 	_ready = true
 
 
@@ -119,7 +124,7 @@ static func _try_load_disc_frames() -> bool:
 	var spin: Array = []
 	for p in DISC_SPIN_PATHS:
 		spin.append(load(p) as Texture2D)
-	_add_anim(frames, "spin", spin, 16.0, true)
+	_add_anim(frames, "spin", spin, 18.0, true)
 	var lie_tex: Texture2D = load(DISC_LIE_PATH) as Texture2D
 	_disc_texture = lie_tex
 	_add_anim(frames, "lie", [lie_tex], 1.0, true)
@@ -131,12 +136,12 @@ static func _build_asset_golfer_frames(variant: int) -> SpriteFrames:
 	var prefix: String = GOLFER_VARIANTS[variant]
 	var frames := SpriteFrames.new()
 	var fps := {
-		"idle": 5.0,
+		"idle": 4.0,
 		"walk": 10.0,
-		"prepare": 6.0,
-		"run_up": 12.0,
-		"throw": 11.0,
-		"putt": 8.0,
+		"prepare": 5.0,
+		"run_up": 11.0,
+		"throw": 10.0,
+		"putt": 9.0,
 	}
 	var loops := {
 		"idle": true,
@@ -259,7 +264,7 @@ static func _make_disc_frames() -> SpriteFrames:
 	for i in range(8):
 		var t: float = float(i) / 8.0
 		spin.append(_make_disc_texture(t * TAU, 1.0 + 0.08 * sin(t * TAU)))
-	_add_anim(frames, "spin", spin, 16.0, true)
+	_add_anim(frames, "spin", spin, 18.0, true)
 	var lie: Array = [_make_disc_texture(0.0, 1.0)]
 	_add_anim(frames, "lie", lie, 1.0, true)
 	return frames

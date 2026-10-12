@@ -1134,11 +1134,15 @@ func draw_tree(
 		var s: float = target_h / maxf(1.0, float(tex.get_height()))
 		var size := Vector2(float(tex.get_width()), float(tex.get_height())) * s
 		var top_left := crown_center - Vector2(size.x * 0.5, size.y * 0.82)
-		var tint := Color(1, 1, 1, 1)
+		# Kenney "Shaded" foliage is greyscale — tint to course greens.
+		var tint := Color(0.32, 0.62, 0.34, 1.0)
 		if not owned_tree:
-			tint = Color(0.88, 0.92, 0.86, 1.0)
+			tint = Color(0.28, 0.52, 0.30, 1.0)
 		if height_weight > 0.35:
-			tint = tint.darkened(0.08 * height_weight)
+			tint = tint.darkened(0.10 * height_weight)
+		# Stable per-tree hue variance from position.
+		var hue_nudge: float = 0.92 + 0.16 * (float(posmod(idx * 17, 10)) / 10.0)
+		tint = Color(tint.r * hue_nudge, tint.g, tint.b * (2.0 - hue_nudge), 1.0)
 		draw_texture_rect(tex, Rect2(top_left, size), false, tint)
 		return
 

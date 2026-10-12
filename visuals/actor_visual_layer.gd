@@ -56,7 +56,14 @@ func setup(property_ref) -> void:
 		bubble_pool.append(bubble)
 
 
-func sync_visitor(visitor: Dictionary, person: Dictionary, body_world: Vector2, facing_x: float, putting: bool = false) -> void:
+func sync_visitor(
+	visitor: Dictionary,
+	person: Dictionary,
+	body_world: Vector2,
+	facing_x: float,
+	putting: bool = false,
+	shot_progress: float = -1.0
+) -> void:
 	var id: int = int(visitor["id"])
 	var stage: String = str(visitor["stage"])
 	if stage in ["driving_in", "driving_out"]:
@@ -65,7 +72,7 @@ func sync_visitor(visitor: Dictionary, person: Dictionary, body_world: Vector2, 
 	var actor = _ensure_golfer(id, person)
 	actor.set_visible_actor(true)
 	actor.set_world_pose(body_world, facing_x)
-	actor.play_for_stage(stage, str(visitor.get("shot_style", "")), putting)
+	actor.play_for_stage(stage, str(visitor.get("shot_style", "")), putting, shot_progress)
 	var disc = _ensure_disc(id)
 	if stage in ["throwing", "standstill", "run_up", "disc_flying", "waiting_group", "waiting_group_lie", "walking_group_lie", "walking_to_lie", "walking_to_basket"]:
 		if stage == "disc_flying":
