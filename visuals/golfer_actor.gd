@@ -30,11 +30,11 @@ func setup(id: int, shirt: Color, palette_index: int) -> void:
 	body.sprite_frames = SpriteKitScript.golfer_frames(palette_index, shirt)
 	# Pipeline sheets are 80×96; procedural fallback is ~36×44.
 	if SpriteKitScript.using_asset_golfers():
-		body.position = Vector2(0, -22)
-		body.scale = Vector2(0.95, 0.95)
+		body.position = Vector2(0, -24)
+		body.scale = Vector2(1.2, 1.2)
 		body.modulate = Color(1, 1, 1)
-		shadow.scale = Vector2(1.55, 1.35)
-		shadow.position = Vector2(2, 10)
+		shadow.scale = Vector2(1.7, 1.45)
+		shadow.position = Vector2(2, 11)
 	else:
 		body.position = Vector2(0, -12)
 		body.scale = Vector2(1.9, 1.9)
