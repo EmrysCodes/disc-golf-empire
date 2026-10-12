@@ -18,7 +18,8 @@ func setup() -> void:
 	disc = AnimatedSprite2D.new()
 	disc.sprite_frames = SpriteKitScript.disc_frames()
 	disc.centered = true
-	disc.scale = Vector2(1.6, 1.6)
+	# Custom disc PNGs are 48px; procedural frames are 18px.
+	disc.scale = Vector2(0.85, 0.85) if SpriteKitScript.using_asset_discs() else Vector2(1.6, 1.6)
 	disc.play("lie")
 	add_child(disc)
 
@@ -32,7 +33,8 @@ func set_lie(world: Vector2) -> void:
 	shadow.modulate.a = 0.55
 	shadow.scale = Vector2(0.45, 0.45)
 	disc.rotation = 0.0
-	disc.scale = Vector2(1.55, 1.55)
+	var base := 0.85 if SpriteKitScript.using_asset_discs() else 1.55
+	disc.scale = Vector2(base, base)
 	if disc.animation != "lie":
 		disc.play("lie")
 
@@ -51,8 +53,9 @@ func set_flight(disc_world: Vector2, ground_world: Vector2, progress: float, hea
 	if dir.length_squared() < 0.001:
 		dir = Vector2.RIGHT
 	disc.rotation = dir.angle()
+	var base := 0.85 if SpriteKitScript.using_asset_discs() else 1.55
 	var bank := 1.0 + 0.22 * sin(progress * PI)
-	disc.scale = Vector2(1.55 * bank, 1.35 / bank) * lerpf(1.0, 1.18, sin(progress * PI))
+	disc.scale = Vector2(base * bank, (base * 0.87) / bank) * lerpf(1.0, 1.18, sin(progress * PI))
 	if disc.animation != "spin" or not disc.is_playing():
 		disc.play("spin")
 

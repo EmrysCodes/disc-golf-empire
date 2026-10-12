@@ -1,5 +1,5 @@
-# Runtime procedural sprite sheets for golfers + discs.
-# Prefer AnimatedSprite2D / Sprite2D over stick-figure _draw.
+# Asset-backed SpriteFrames for golfers + discs (Kenney CC0 + custom discs).
+# Falls back to procedural ImageTextures if PNGs are missing.
 extends RefCounted
 
 const GOLFER_W := 36
@@ -8,35 +8,84 @@ const DISC_SIZE := 18
 const SHADOW_W := 28
 const SHADOW_H := 12
 
-static var _frames_by_palette: Dictionary = {}
+const GOLFER_VARIANTS := [
+	"res://art/golfers/kenney_toon/male_person/character_malePerson_",
+	"res://art/golfers/kenney_toon/female_person/character_femalePerson_",
+	"res://art/golfers/kenney_toon/male_adventurer/character_maleAdventurer_",
+	"res://art/golfers/kenney_toon/female_adventurer/character_femaleAdventurer_",
+]
+
+# Pose names mapped to gameplay anims (Kenney Toon Characters Pack 1).
+const ANIM_POSE_MAP := {
+	"idle": ["idle", "idle", "think", "idle", "side", "idle"],
+	"walk": ["walk0", "walk1", "walk2", "walk3", "walk4", "walk5", "walk6", "walk7"],
+	"prepare": ["hold", "think", "hold", "wide"],
+	"run_up": ["run0", "run1", "run2", "run1", "run0", "run2"],
+	"throw": ["hold", "attack0", "attack1", "attack2", "wide", "cheer0"],
+	"putt": ["duck", "hold", "interact", "wide", "duck"],
+}
+
+const DISC_SPIN_PATHS := [
+	"res://art/discs/disc_spin_00.png",
+	"res://art/discs/disc_spin_01.png",
+	"res://art/discs/disc_spin_02.png",
+	"res://art/discs/disc_spin_03.png",
+	"res://art/discs/disc_spin_04.png",
+	"res://art/discs/disc_spin_05.png",
+	"res://art/discs/disc_spin_06.png",
+	"res://art/discs/disc_spin_07.png",
+]
+const DISC_LIE_PATH := "res://art/discs/disc_lie.png"
+
+static var _frames_by_key: Dictionary = {}
 static var _disc_frames: SpriteFrames
 static var _disc_texture: Texture2D
 static var _shadow_texture: Texture2D
 static var _ready := false
+static var _asset_golfers := false
+static var _asset_discs := false
 
 
 static func ensure_ready() -> void:
 	if _ready:
 		return
-	_disc_texture = _make_disc_texture(0.0, 1.0)
-	_disc_frames = _make_disc_frames()
 	_shadow_texture = _make_shadow_texture()
+	_asset_discs = _try_load_disc_frames()
+	if not _asset_discs:
+		_disc_texture = _make_disc_texture(0.0, 1.0)
+		_disc_frames = _make_disc_frames()
+	_asset_golfers = _probe_golfer_assets()
 	_ready = true
+
+
+static func using_asset_golfers() -> bool:
+	ensure_ready()
+	return _asset_golfers
+
+
+static func using_asset_discs() -> bool:
+	ensure_ready()
+	return _asset_discs
 
 
 static func golfer_frames(palette_index: int, shirt: Color) -> SpriteFrames:
 	ensure_ready()
-	var key := "v2_%d_%s" % [palette_index, shirt.to_html(false)]
-	if _frames_by_palette.has(key):
-		return _frames_by_palette[key]
-	var frames := SpriteFrames.new()
-	_add_anim(frames, "idle", _build_golfer_strip(shirt, "idle", 6), 6.0, true)
-	_add_anim(frames, "walk", _build_golfer_strip(shirt, "walk", 8), 11.0, true)
-	_add_anim(frames, "prepare", _build_golfer_strip(shirt, "prepare", 4), 7.0, true)
-	_add_anim(frames, "run_up", _build_golfer_strip(shirt, "run_up", 6), 12.0, false)
-	_add_anim(frames, "throw", _build_golfer_strip(shirt, "throw", 6), 12.0, false)
-	_add_anim(frames, "putt", _build_golfer_strip(shirt, "putt", 5), 9.0, false)
-	_frames_by_palette[key] = frames
+	var variant: int = posmod(palette_index, GOLFER_VARIANTS.size())
+	var key := "asset_%d" % variant if _asset_golfers else "proc_%d_%s" % [variant, shirt.to_html(false)]
+	if _frames_by_key.has(key):
+		return _frames_by_key[key]
+	var frames: SpriteFrames
+	if _asset_golfers:
+		frames = _build_asset_golfer_frames(variant)
+	else:
+		frames = SpriteFrames.new()
+		_add_anim(frames, "idle", _build_golfer_strip(shirt, "idle", 6), 6.0, true)
+		_add_anim(frames, "walk", _build_golfer_strip(shirt, "walk", 8), 11.0, true)
+		_add_anim(frames, "prepare", _build_golfer_strip(shirt, "prepare", 4), 7.0, true)
+		_add_anim(frames, "run_up", _build_golfer_strip(shirt, "run_up", 6), 12.0, false)
+		_add_anim(frames, "throw", _build_golfer_strip(shirt, "throw", 6), 12.0, false)
+		_add_anim(frames, "putt", _build_golfer_strip(shirt, "putt", 5), 9.0, false)
+	_frames_by_key[key] = frames
 	return frames
 
 
@@ -53,6 +102,68 @@ static func disc_frames() -> SpriteFrames:
 static func shadow_texture() -> Texture2D:
 	ensure_ready()
 	return _shadow_texture
+
+
+static func _probe_golfer_assets() -> bool:
+	var path: String = GOLFER_VARIANTS[0] + "idle.png"
+	return ResourceLoader.exists(path)
+
+
+static func _try_load_disc_frames() -> bool:
+	if not ResourceLoader.exists(DISC_LIE_PATH):
+		return false
+	for p in DISC_SPIN_PATHS:
+		if not ResourceLoader.exists(p):
+			return false
+	var frames := SpriteFrames.new()
+	var spin: Array = []
+	for p in DISC_SPIN_PATHS:
+		spin.append(load(p) as Texture2D)
+	_add_anim(frames, "spin", spin, 16.0, true)
+	var lie_tex: Texture2D = load(DISC_LIE_PATH) as Texture2D
+	_disc_texture = lie_tex
+	_add_anim(frames, "lie", [lie_tex], 1.0, true)
+	_disc_frames = frames
+	return true
+
+
+static func _build_asset_golfer_frames(variant: int) -> SpriteFrames:
+	var prefix: String = GOLFER_VARIANTS[variant]
+	var frames := SpriteFrames.new()
+	var fps := {
+		"idle": 5.0,
+		"walk": 10.0,
+		"prepare": 6.0,
+		"run_up": 12.0,
+		"throw": 11.0,
+		"putt": 8.0,
+	}
+	var loops := {
+		"idle": true,
+		"walk": true,
+		"prepare": true,
+		"run_up": false,
+		"throw": false,
+		"putt": false,
+	}
+	for anim_name in ANIM_POSE_MAP.keys():
+		var poses: Array = ANIM_POSE_MAP[anim_name]
+		var textures: Array = []
+		for pose in poses:
+			var path: String = "%s%s.png" % [prefix, pose]
+			if ResourceLoader.exists(path):
+				textures.append(load(path) as Texture2D)
+		if textures.is_empty():
+			# Keep anim present so callers never crash.
+			textures.append(_make_golfer_frame(Color(0.4, 0.55, 0.7), "idle", 0.0, 0))
+		_add_anim(
+			frames,
+			anim_name,
+			textures,
+			float(fps.get(anim_name, 8.0)),
+			bool(loops.get(anim_name, true))
+		)
+	return frames
 
 
 static func _add_anim(frames: SpriteFrames, anim_name: String, textures: Array, fps: float, loop: bool) -> void:
@@ -119,11 +230,9 @@ static func _make_golfer_frame(shirt: Color, anim: String, t: float, frame_i: in
 			crouch = lerpf(1.5, 0.4, t)
 	var body_x := cx + lean
 	var body_y := foot_y - 15.0 + bob + crouch
-	# Legs with stride for walk/run_up.
 	_fill_ellipse(img, body_x - 3.5 - stride * 0.35, foot_y - 1.0, 2.4, 1.5, Color(0.16, 0.14, 0.12, 0.95))
 	_fill_ellipse(img, body_x + 3.5 + stride * 0.35, foot_y - 1.0, 2.4, 1.5, Color(0.16, 0.14, 0.12, 0.95))
 	_fill_rect_soft(img, int(body_x - 2.8), int(body_y + 2.0), 6, 11, shirt.darkened(0.38))
-	# Torso with faux depth (darker right edge).
 	_fill_ellipse(img, body_x, body_y, 6.8, 8.0, shirt.darkened(0.14))
 	_fill_ellipse(img, body_x - 1.3, body_y - 0.9, 4.8, 6.0, shirt)
 	_fill_ellipse(img, body_x + 2.6, body_y + 0.7, 2.2, 4.8, shirt.darkened(0.3))
@@ -139,7 +248,6 @@ static func _make_golfer_frame(shirt: Color, anim: String, t: float, frame_i: in
 		var dy := arm_y - 1.2 - arm_swing * 0.16
 		_fill_ellipse(img, dx, dy, 3.6, 1.7, Color(0.98, 0.83, 0.23, 1.0))
 		_fill_ellipse(img, dx - 0.4, dy - 0.3, 1.7, 0.75, Color(1.0, 0.93, 0.55, 0.85))
-	# Subtle frame index pepper so strips don't look static.
 	if frame_i % 2 == 0:
 		_fill_ellipse(img, body_x + 1.5, body_y + 3.0, 1.0, 1.4, shirt.darkened(0.18))
 	return ImageTexture.create_from_image(img)
@@ -165,12 +273,10 @@ static func _make_disc_texture(spin_phase: float = 0.0, squash: float = 1.0) -> 
 	var ry := 2.7 / maxf(0.75, squash * 0.85)
 	_fill_ellipse(img, c + 0.7, c + 0.9, rx + 0.4, ry + 0.35, Color(0, 0, 0, 0.22))
 	_fill_ellipse(img, c, c, rx, ry, Color(0.96, 0.78, 0.18, 1.0))
-	# Spin highlight sweeps around the rim.
 	var hx := cos(spin_phase) * rx * 0.35
 	var hy := sin(spin_phase) * ry * 0.45
 	_fill_ellipse(img, c - 0.4 + hx, c - 0.4 + hy, 2.8, 1.1, Color(1.0, 0.94, 0.5, 0.9))
 	_stroke_ellipse(img, c, c, rx, ry, Color(0.25, 0.22, 0.12, 0.85))
-	# Flight plate stamp
 	_fill_ellipse(img, c + cos(spin_phase + 1.2) * 1.5, c + sin(spin_phase + 1.2) * 0.7, 1.2, 0.55, Color(0.85, 0.55, 0.12, 0.7))
 	return ImageTexture.create_from_image(img)
 

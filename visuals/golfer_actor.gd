@@ -26,14 +26,23 @@ func setup(id: int, shirt: Color, palette_index: int) -> void:
 	add_child(shadow)
 	body = AnimatedSprite2D.new()
 	body.centered = true
-	body.position = Vector2(0, -12)
-	body.scale = Vector2(1.9, 1.9)
 	body.sprite_frames = SpriteKitScript.golfer_frames(palette_index, shirt)
+	# Kenney HD poses are ~192x256; procedural frames are ~36x44.
+	if SpriteKitScript.using_asset_golfers():
+		body.position = Vector2(0, -22)
+		body.scale = Vector2(0.38, 0.38)
+		# Mild shirt-color wash without wrecking skin tones.
+		body.modulate = Color(1, 1, 1).lerp(shirt.lightened(0.15), 0.18)
+		shadow.scale = Vector2(1.85, 1.55)
+		shadow.position = Vector2(4, 10)
+	else:
+		body.position = Vector2(0, -12)
+		body.scale = Vector2(1.9, 1.9)
+		shadow.scale = Vector2(1.4, 1.4)
+		shadow.position = Vector2(3, 13)
 	body.play(ANIM_IDLE)
 	_current_anim = ANIM_IDLE
 	add_child(body)
-	shadow.scale = Vector2(1.4, 1.4)
-	shadow.position = Vector2(3, 13)
 
 
 func set_world_pose(world: Vector2, facing_x: float = 1.0) -> void:

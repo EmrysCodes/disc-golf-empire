@@ -11,8 +11,12 @@
 
 | Path | Role |
 |------|------|
-| `art/golfers/` | Reserved for authored golfer sheets (idle/walk/throw/putt). |
-| `art/discs/` | Reserved for disc / trail accents. |
-| `visuals/` | Runtime Sprite2D / AnimatedSprite2D pipeline + pools. |
+| `art/golfers/kenney_toon/` | Kenney Toon HD poses (4 variants) → SpriteFrames |
+| `art/discs/` | Custom disc spin / lie PNGs |
+| `art/trees/kenney_foliage/` | Mobile-sized foliage crowns for trees |
+| `art/terrain/kenney_tiny_town/` | Optional path / grass tile cues |
+| `art/licenses/` | Upstream license text copies |
+| `art/ATTRIBUTION.md` | Sources + license summary |
+| `visuals/` | Runtime Sprite2D / AnimatedSprite2D pipeline + pools |
 
-First vertical uses **procedural `SpriteKit`** (`visuals/sprite_kit.gd`) to build `ImageTexture` frames at runtime so the AnimatedSprite2D path works without binary sheets. Drop PNG atlases here later and point `SpriteKit` at them.
+`visuals/sprite_kit.gd` loads PNG assets when present and falls back to procedural frames otherwise.

@@ -39,8 +39,29 @@ const RENDER_INTERVAL := 1.0 / MAX_RENDER_FPS
 # Dev-only: draw collision crown (outer) and trunk (inner) rings on property trees.
 const DEBUG_DRAW_TREE_COLLISION := false
 
+# Kenney Foliage Sprites (CC0) — curated bushy crowns for 2.5D tree mass.
+const TREE_SPRITE_PATHS := [
+	"res://art/trees/kenney_foliage/sprite_0052.png",
+	"res://art/trees/kenney_foliage/sprite_0055.png",
+	"res://art/trees/kenney_foliage/sprite_0059.png",
+	"res://art/trees/kenney_foliage/sprite_0062.png",
+	"res://art/trees/kenney_foliage/sprite_0066.png",
+	"res://art/trees/kenney_foliage/sprite_0070.png",
+	"res://art/trees/kenney_foliage/sprite_0073.png",
+	"res://art/trees/kenney_foliage/sprite_0077.png",
+	"res://art/trees/kenney_foliage/sprite_0083.png",
+	"res://art/trees/kenney_foliage/sprite_0086.png",
+	"res://art/trees/kenney_foliage/sprite_0090.png",
+	"res://art/trees/kenney_foliage/sprite_0093.png",
+	"res://art/trees/kenney_foliage/sprite_0096.png",
+	"res://art/trees/kenney_foliage/sprite_0098.png",
+	"res://art/trees/kenney_foliage/sprite_0101.png",
+]
+
 var redraw_requested := true
 var redraw_accumulator := 0.0
+var _tree_textures: Array = []
+var _tree_textures_ready := false
 
 
 # ==================================================
@@ -1032,6 +1053,18 @@ func draw_tree_from_record(
 	)
 
 
+func _ensure_tree_textures() -> void:
+	if _tree_textures_ready:
+		return
+	_tree_textures.clear()
+	for path in TREE_SPRITE_PATHS:
+		if ResourceLoader.exists(path):
+			var tex: Texture2D = load(path) as Texture2D
+			if tex != null:
+				_tree_textures.append(tex)
+	_tree_textures_ready = true
+
+
 func draw_tree(
 	world_position: Vector2,
 	tree_scale: float,
@@ -1087,6 +1120,27 @@ func draw_tree(
 		trunk_radius,
 		Color(0.25, 0.19, 0.11, 0.78)
 	)
+
+	_ensure_tree_textures()
+	if _tree_textures.size() > 0:
+		# Stable variant from world position — no schema change.
+		var idx: int = posmod(
+			int(world_position.x * 0.17) * 73856093
+			^ int(world_position.y * 0.17) * 19349663,
+			_tree_textures.size()
+		)
+		var tex: Texture2D = _tree_textures[idx]
+		var target_h: float = crown_radius * 2.35 + crown_lift * 0.85
+		var s: float = target_h / maxf(1.0, float(tex.get_height()))
+		var size := Vector2(float(tex.get_width()), float(tex.get_height())) * s
+		var top_left := crown_center - Vector2(size.x * 0.5, size.y * 0.82)
+		var tint := Color(1, 1, 1, 1)
+		if not owned_tree:
+			tint = Color(0.88, 0.92, 0.86, 1.0)
+		if height_weight > 0.35:
+			tint = tint.darkened(0.08 * height_weight)
+		draw_texture_rect(tex, Rect2(top_left, size), false, tint)
+		return
 
 	var outer_color := Color(0.13, 0.28, 0.15, 1.0)
 	var inner_color := Color(0.22, 0.42, 0.23, 1.0)
